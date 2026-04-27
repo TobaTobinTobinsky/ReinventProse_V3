@@ -16,12 +16,23 @@
 #include "../encabezados/CustomAboutDialog.h"
 #include "../encabezados/Util.h"
 
+// include
 #include <wx/artprov.h>
 #include <wx/msgdlg.h>
 #include <wx/filedlg.h>
 #include <wx/stdpaths.h>
 #include <fstream>
 #include <sstream>
+#include <wx/mstream.h>
+
+// Resources
+#include <IconData.h>
+#include "NewBookData.h"
+#include "SaveData.h"
+#include "EditData.h"
+#include "LibraryData.h"
+#include "UndoData.h"
+#include "RedoData.h"
 
  // ============================================================================
  // TABLA DE EVENTOS ESTÁTICA
@@ -81,13 +92,18 @@ wxString MainWindow::_get_resource_path(const wxString& file_name) {
 }
 
 void MainWindow::_set_application_icon() {
-    wxString icon_path = _get_resource_path(APP_ICON);
-    if (!icon_path.IsEmpty() && wxFileName::FileExists(icon_path)) {
-        wxIcon icon(icon_path, wxBITMAP_TYPE_ICO);
-        if (icon.IsOk()) {
-            SetIcon(icon);
-        }
+    // 1. Creamos el flujo de lectura apuntando al array que vive en IconData.h
+    wxMemoryInputStream iconStream(app_icon_data, app_icon_data_size);
+
+    // 2. Cargamos la imagen especificando que el contenido es tipo ICO
+    wxImage iconImage;
+    if (iconImage.LoadFile(iconStream, wxBITMAP_TYPE_ICO)) {
+        // 3. Convertimos a icono y lo pegamos a la ventana
+        wxIcon windowIcon;
+        windowIcon.CopyFromBitmap(wxBitmap(iconImage));
+        this->SetIcon(windowIcon);
     }
+    // Si falla, no hace nada (queda el genérico), pero no rompe por rutas inexistentes
 }
 
 wxBitmap MainWindow::_load_tool_icon(const wxString& icon_name, const wxSize& icon_size) {
@@ -191,6 +207,16 @@ void MainWindow::_create_toolbar() {
 // LÓGICA DE INTERFAZ Y ESTADOS
 // ============================================================================
 
+wxBitmap MainWindow::_get_res_bmp(const unsigned char* data, unsigned int size) {
+    wxMemoryInputStream stream(data, size);
+    wxImage img;
+    if (img.LoadFile(stream, wxBITMAP_TYPE_ANY)) {
+        // Rescatamos la imagen al tamaño estándar de la toolbar (24x24)
+        return wxBitmap(img.Rescale(24, 24, wxIMAGE_QUALITY_HIGH));
+    }
+    return wxNullBitmap;
+}
+
 void MainWindow::_update_toolbar_state(int state) {
     wxToolBar* tb = GetToolBar();
     if (!tb) return;
@@ -198,23 +224,28 @@ void MainWindow::_update_toolbar_state(int state) {
     tb->ClearTools();
     m_current_app_state = state;
 
+    // --- ESTADO: BIBLIOTECA ---
     if (state == STATE_LIBRARY) {
-        tb->AddTool(wxID_NEW, "Nuevo", _load_tool_icon("new_book.png", wxSize(24, 24)), "Crear nuevo libro");
-    }
-    else if (state == STATE_DETAILS) {
-        tb->AddTool(ID_TOOL_BACK_TO_LIBRARY, "Biblioteca", _load_tool_icon("library.png", wxSize(24, 24)));
-        tb->AddTool(ID_TOOL_EDIT_BOOK, "Editar", _load_tool_icon("edit.png", wxSize(24, 24)));
-        tb->AddTool(wxID_SAVE, "Guardar", _load_tool_icon("save.png", wxSize(24, 24)));
-    }
-    else if (state == STATE_EDIT) {
-        tb->AddTool(ID_TOOL_BACK_TO_LIBRARY, "Biblioteca", _load_tool_icon("library.png", wxSize(24, 24)));
-        tb->AddTool(wxID_SAVE, "Guardar", _load_tool_icon("save.png", wxSize(24, 24)));
-        tb->AddSeparator();
-        tb->AddTool(wxID_UNDO, "Deshacer", _load_tool_icon("undo.png", wxSize(24, 24)));
-        tb->AddTool(wxID_REDO, "Rehacer", _load_tool_icon("redo.png", wxSize(24, 24)));
+        tb->AddTool(wxID_NEW, "Nuevo", _get_res_bmp(new_book_data, new_book_data_size), "Crear nuevo libro");
     }
 
-    tb->Realize();
+    // --- ESTADO: DETALLES DEL LIBRO ---
+    else if (state == STATE_DETAILS) {
+        tb->AddTool(ID_TOOL_BACK_TO_LIBRARY, "Biblioteca", _get_res_bmp(library_data, library_data_size), "Volver a la biblioteca");
+        tb->AddTool(ID_TOOL_EDIT_BOOK, "Editar", _get_res_bmp(edit_data, edit_data_size), "Editar capítulos");
+        tb->AddTool(wxID_SAVE, "Guardar", _get_res_bmp(save_data, save_data_size), "Guardar cambios");
+    }
+
+    // --- ESTADO: EDICIÓN DE CAPÍTULO ---
+    else if (state == STATE_EDIT) {
+        tb->AddTool(ID_TOOL_BACK_TO_LIBRARY, "Biblioteca", _get_res_bmp(library_data, library_data_size), "Volver a la biblioteca");
+        tb->AddTool(wxID_SAVE, "Guardar", _get_res_bmp(save_data, save_data_size), "Guardar cambios");
+        tb->AddSeparator();
+        tb->AddTool(wxID_UNDO, "Deshacer", _get_res_bmp(undo_data, undo_data_size), "Deshacer (Ctrl+Z)");
+        tb->AddTool(wxID_REDO, "Rehacer", _get_res_bmp(redo_data, redo_data_size), "Rehacer (Ctrl+Y)");
+    }
+
+    tb->Realize(); // Refresca la toolbar visualmente
 }
 
 void MainWindow::set_dirty_status_in_title(bool is_dirty) {

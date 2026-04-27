@@ -47,6 +47,7 @@ private:
     void _create_views();
     void _ensure_edit_notebook();
     wxBitmap _load_tool_icon(const wxString& icon_name, const wxSize& icon_size);
+    wxBitmap _get_res_bmp(const unsigned char* data, unsigned int size);
 
     // --- Lógica de Interfaz y Estados ---
     void _update_toolbar_state(int new_state);
