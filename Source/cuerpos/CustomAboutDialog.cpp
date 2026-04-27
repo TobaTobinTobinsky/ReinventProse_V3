@@ -1,0 +1,153 @@
+/**
+* File Name: CustomAboutDialog.cpp
+* Descripción: Implementación del Frame de créditos con soporte UTF-8.
+*/
+
+#include "../encabezados/CustomAboutDialog.h"
+#include "../encabezados/Util.h"
+#include <wx/sizer.h>
+#include <wx/stattext.h>
+#include <wx/statbmp.h>
+
+// --- Implementación de ReinventProseAboutInfo ---
+
+ReinventProseAboutInfo::ReinventProseAboutInfo() {}
+void ReinventProseAboutInfo::SetName(const std::string& name) { m_name = name; }
+std::string ReinventProseAboutInfo::GetName() const { return m_name; }
+void ReinventProseAboutInfo::SetVersion(const std::string& version) { m_version = version; }
+std::string ReinventProseAboutInfo::GetVersion() const { return m_version; }
+void ReinventProseAboutInfo::SetDescription(const std::string& description) { m_description = description; }
+std::string ReinventProseAboutInfo::GetDescription() const { return m_description; }
+void ReinventProseAboutInfo::SetCopyright(const std::string& copyright) { m_copyright = copyright; }
+std::string ReinventProseAboutInfo::GetCopyright() const { return m_copyright; }
+void ReinventProseAboutInfo::SetLicense(const std::string& license) { m_license = license; }
+std::string ReinventProseAboutInfo::GetLicense() const { return m_license; }
+void ReinventProseAboutInfo::SetWebSite(const std::string& url, const std::string& desc) { m_website_url = url; m_website_desc = desc; }
+std::string ReinventProseAboutInfo::GetWebSiteURL() const { return m_website_url; }
+std::string ReinventProseAboutInfo::GetWebSiteDescription() const { return m_website_desc; }
+void ReinventProseAboutInfo::SetIcon(const wxIcon& icon) { m_icon = icon; }
+wxIcon ReinventProseAboutInfo::GetIcon() const { return m_icon; }
+void ReinventProseAboutInfo::AddDeveloper(const std::string& d) { m_developers.push_back(d); }
+std::vector<std::string> ReinventProseAboutInfo::GetDevelopers() const { return m_developers; }
+void ReinventProseAboutInfo::AddDocWriter(const std::string& w) { m_doc_writers.push_back(w); }
+std::vector<std::string> ReinventProseAboutInfo::GetDocWriters() const { return m_doc_writers; }
+void ReinventProseAboutInfo::AddArtist(const std::string& a) { m_artists.push_back(a); }
+std::vector<std::string> ReinventProseAboutInfo::GetArtists() const { return m_artists; }
+void ReinventProseAboutInfo::AddTranslator(const std::string& t) { m_translators.push_back(t); }
+std::vector<std::string> ReinventProseAboutInfo::GetTranslators() const { return m_translators; }
+void ReinventProseAboutInfo::AddCollaborator(const std::string& n, const std::string& c) { m_collaborators.push_back({ n, c }); }
+std::vector<std::pair<std::string, std::string>> ReinventProseAboutInfo::GetCollaborators() const { return m_collaborators; }
+
+// --- Implementación de ReinventProseAboutFrame ---
+
+wxBEGIN_EVENT_TABLE(ReinventProseAboutFrame, wxFrame)
+EVT_SIZE(ReinventProseAboutFrame::OnSize)
+wxEND_EVENT_TABLE()
+
+ReinventProseAboutFrame::ReinventProseAboutFrame(wxWindow* parent, const ReinventProseAboutInfo& info)
+    : wxFrame(parent, wxID_ANY, wxString::FromUTF8("Acerca de " + info.GetName()),
+        wxDefaultPosition, wxSize(600, 550),
+        wxDEFAULT_FRAME_STYLE | wxSTAY_ON_TOP),
+    m_info(info)
+{
+    _create_ui();
+    _populate_data();
+
+    this->CentreOnParent();
+}
+
+void ReinventProseAboutFrame::_create_ui() {
+    wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
+
+    // Logo
+    wxBitmap logo_bmp = load_icon_bitmap(LOGO_FILENAME, LOGO_DISPLAY_SIZE);
+    m_logo_ctrl = new wxStaticBitmap(this, wxID_ANY, logo_bmp);
+    main_sizer->Add(m_logo_ctrl, 0, wxALIGN_CENTER | wxALL, 15);
+
+    // Notebook
+    m_notebook = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxNB_MULTILINE);
+
+    // Crear pestañas usando la función auxiliar
+    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_general), "General");
+    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_license), "Licencia");
+    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_developers), "Desarrollo");
+    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_doc), "Documentación");
+    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_artists), "Arte");
+    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_translators), "Traducción");
+    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_collaborators), "Colaboradores");
+
+    main_sizer->Add(m_notebook, 1, wxEXPAND | wxALL, 10);
+
+    // Botón cerrar
+    wxButton* close_btn = new wxButton(this, wxID_OK, "Cerrar");
+    close_btn->Bind(wxEVT_BUTTON, &ReinventProseAboutFrame::OnCloseButton, this);
+    main_sizer->Add(close_btn, 0, wxALIGN_CENTER | wxBOTTOM, 10);
+
+    SetSizer(main_sizer);
+}
+
+wxPanel* ReinventProseAboutFrame::_create_tab_text_panel(wxNotebook* parent, wxTextCtrl** ctrl_out) {
+    wxPanel* panel = new wxPanel(parent);
+    wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+
+    // IMPORTANTE: wxTE_READONLY pero Enable(true) para que funcione el scrollbar.
+    *ctrl_out = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
+        wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2 | wxBORDER_NONE);
+    (*ctrl_out)->SetBackgroundColour(panel->GetBackgroundColour());
+
+    sizer->Add(*ctrl_out, 1, wxEXPAND | wxALL, 5);
+    panel->SetSizer(sizer);
+    return panel;
+}
+
+void ReinventProseAboutFrame::_populate_data() {
+    // General
+    wxString gen;
+    gen << wxString::FromUTF8(m_info.GetName()) << " " << wxString::FromUTF8(m_info.GetVersion()) << "\n\n"
+        << wxString::FromUTF8(m_info.GetCopyright()) << "\n\n"
+        << wxString::FromUTF8(m_info.GetDescription());
+
+    if (!m_info.GetWebSiteURL().empty()) {
+        gen << "\n\nSitio Web: " << m_info.GetWebSiteURL();
+    }
+    m_txt_general->SetValue(gen);
+
+    // Licencia
+    m_txt_license->SetValue(wxString::FromUTF8(m_info.GetLicense()));
+
+    // Listas (Desarrolladores, etc.)
+    auto populate_list = [](wxTextCtrl* ctrl, const std::vector<std::string>& list) {
+        wxString s;
+        if (list.empty()) s = "(No especificado)";
+        else {
+            for (const auto& item : list) s << "- " << wxString::FromUTF8(item) << "\n";
+        }
+        ctrl->SetValue(s);
+        };
+
+    populate_list(m_txt_developers, m_info.GetDevelopers());
+    populate_list(m_txt_doc, m_info.GetDocWriters());
+    populate_list(m_txt_artists, m_info.GetArtists());
+    populate_list(m_txt_translators, m_info.GetTranslators());
+
+    // Colaboradores
+    wxString colab;
+    auto colab_list = m_info.GetCollaborators();
+    if (colab_list.empty()) colab = "(Ninguno)";
+    else {
+        for (const auto& pair : colab_list) {
+            colab << "- " << wxString::FromUTF8(pair.first);
+            if (!pair.second.empty()) colab << ": " << wxString::FromUTF8(pair.second);
+            colab << "\n";
+        }
+    }
+    m_txt_collaborators->SetValue(colab);
+}
+
+void ReinventProseAboutFrame::OnCloseButton(wxCommandEvent& event) {
+    this->Close(true);
+}
+
+void ReinventProseAboutFrame::OnSize(wxSizeEvent& event) {
+    this->Layout();
+}

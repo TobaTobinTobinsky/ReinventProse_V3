@@ -1,0 +1,15 @@
+*.exe
+*.o
+*.out
+
+# Ignorar basura de Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.*
+
+# Ignorar compilados (por si acaso)
+Debug/
+Release/
+x64/
+x86/
