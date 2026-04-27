@@ -1,5 +1,0 @@
-git add .
-git commit -m "mensaje"
-git push
-
-git add .  es el que coordina todo, luego el mensaje del commit es que cuernos cambié, y finalmente el push

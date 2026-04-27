@@ -15,3 +15,6 @@ x64/
 x86/
 .vscode/
 include/
+
+# Ignorar archivos extras
+como_subir_a_git.txt
