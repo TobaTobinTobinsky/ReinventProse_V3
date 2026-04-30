@@ -117,6 +117,21 @@ bool AppHandler::update_book_details(int book_id, const wxString& title, const w
     }
 }
 
+bool AppHandler::delete_book(int book_id) {
+    try {
+        if (db_manager->delete_book(book_id)) {
+            // Marcamos como sucio para que la UI sepa que la lista cambió
+            set_dirty(true);
+            return true;
+        }
+    }
+    catch (const std::exception& e) {
+        wxMessageBox(wxString::Format("Error crítico al eliminar el libro: %s", e.what()),
+            "Error de Base de Datos", wxOK | wxICON_ERROR, main_window);
+    }
+    return false;
+}
+
 // --- MÉTODOS PARA CAPÍTULOS ---
 
 std::vector<DBRow> AppHandler::get_chapters_by_book_id(int book_id) {

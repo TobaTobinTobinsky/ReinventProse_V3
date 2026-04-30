@@ -61,6 +61,8 @@ public:
 
     bool update_book_details(int book_id, const wxString& title, const wxString& author, const wxString& synopsis,
         const wxString& prologue, const wxString& back_cover_text, const wxString& cover_image_path);
+    
+    bool delete_book(int book_id);
 
     // --- GESTIÓN DE CAPÍTULOS ---
 
