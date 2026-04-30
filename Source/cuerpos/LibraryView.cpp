@@ -198,7 +198,6 @@ void LibraryView::_on_toggle_sort(wxCommandEvent& event) {
     load_books(); // Recargamos para aplicar el orden
 }
 
-// LibraryView.cpp
 void LibraryView::_on_delete_book_requested(int book_id) {
     auto book_details = m_app_handler->get_book_details(book_id);
     wxString book_title = "este libro";
@@ -216,12 +215,38 @@ void LibraryView::_on_delete_book_requested(int book_id) {
     wxMessageDialog dlg(this, msg, "Confirmar Eliminación", wxYES_NO | wxNO_DEFAULT | wxICON_WARNING);
 
     if (dlg.ShowModal() == wxID_YES) {
-        // LLAMADA REAL AL BACKEND
+        // 1. Ejecutamos el borrado real en la DB
         if (m_app_handler->delete_book(book_id)) {
-            // Si el borrado fue exitoso, limpiamos el estado dirty (porque ya se guardó el cambio en disco)
             m_app_handler->set_dirty(false);
-            // Recargamos la biblioteca para que la tarjeta desaparezca
+
+            // 2. Recargamos la lista interna de la biblioteca
             load_books();
+
+            // --- LÓGICA HUMANA SIN IDs EXTERNOS ---
+
+            // Si estábamos viendo los detalles de un libro (Sidebar Mode)
+            if (m_current_is_sidebar_layout) {
+
+                if (m_book_card_panels.empty()) {
+                    // CASO 1: No quedan más libros. 
+                    // Llamamos al callback con el ID del libro que ACABAMOS de borrar.
+                    // MainWindow verá que ID_Recibido == ID_Actual y ejecutará el retorno a la biblioteca central automáticamente.
+                    if (m_on_card_selected_callback) {
+                        m_on_card_selected_callback(book_id);
+                    }
+                }
+                else {
+                    // CASO 2: Quedan otros libros.
+                    // Buscamos el ID del nuevo "primero" de la lista.
+                    int first_id = m_book_card_panels[0]->get_book_id();
+
+                    // Seleccionamos el primer libro automáticamente
+                    if (m_on_card_selected_callback) {
+                        m_on_card_selected_callback(first_id);
+                    }
+                }
+            }
+            // --- FIN DE LÓGICA ---
         }
     }
 }
