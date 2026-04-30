@@ -24,6 +24,8 @@
 #include <fstream>
 #include <sstream>
 #include <wx/mstream.h>
+#include <format> // La joya de C++20
+
 
 // Resources
 #include <IconData.h>
@@ -609,20 +611,79 @@ void MainWindow::on_export_pdf(wxCommandEvent& event) {
 
 void MainWindow::on_menu_about(wxCommandEvent& event) {
     ReinventProseAboutInfo info;
-    info.SetName(m_app_name.ToStdString());
-    info.SetVersion("3.0.0");
-    info.SetCopyright("(C) 2024 Mauricio Jose Tobares");
-    info.SetDescription("Herramienta profesional para escritores.\nDesarrollada en C++ puro para un máximo rendimiento.");
-    info.SetLicense("MIT License\nReinventProse es software libre.");
 
-    wxString icon_path = _get_resource_path(APP_ICON);
-    if (!icon_path.IsEmpty() && wxFileName::FileExists(icon_path)) {
-        wxIcon icon(icon_path, wxBITMAP_TYPE_ICO);
-        if (icon.IsOk()) info.SetIcon(icon);
-    }
+    // Formateando a la fuerza bruta hasta los campos cortos
+    info.SetName(wxString::Format("ReinventProse 3.0").ToUTF8().data());
+    info.SetVersion(wxString::Format("3.0.42 (Pure C++ Edition)").ToUTF8().data());
+    info.SetCopyright(wxString::Format("(C) 2023-2024 Mauricio José Tobares. Todos los derechos reservados.").ToUTF8().data());
 
-    ReinventProseAboutFrame* frame = new ReinventProseAboutFrame(this, info);
-    frame->Show();
+    // 1 - GENERAL (El que sabíamos que funcionaba)
+    wxString desc = wxString::Format(
+        "Una aplicación de escritorio de alto rendimiento para la gestión integral "
+        "y organización de proyectos de escritura creativa.\n\n"
+        "ReinventProse permite al autor transitar desde la concepción de la idea "
+        "abstracta hasta la estructuración técnica de capítulos y el tablero de ideas concretas.\n\n"
+        "Esta versión %s ha sido reconstruida íntegramente en %s para ofrecer "
+        "una experiencia de escritura con latencia cero.",
+        "3.0", "C++20"
+    );
+    info.SetDescription(desc.ToUTF8().data());
+
+    // 2 - LICENCIA (Formateado forzoso)
+    wxString lic_text = wxString::Format(
+        "MIT License\n\n"
+        "Copyright (c) 2023-2024 Mauricio José Tobares\n\n"
+        "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
+        "of this software and associated documentation files (the \"Software\"), to deal\n"
+        "in the Software without restriction, including without limitation the rights\n"
+        "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
+        "copies of the Software, and to permit persons to whom the Software is\n"
+        "furnished to do so, subject to the following conditions:\n\n"
+        "The above copyright notice and this permission notice shall be included in all\n"
+        "copies or substantial portions of the Software.\n\n"
+        "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
+        "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
+        "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
+        "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
+        "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
+        "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
+        "SOFTWARE."
+    );
+    info.SetLicense(lic_text.ToUTF8().data());
+
+    // --- LA LAMBDA BLINDADA ---
+    // Agarra cualquier texto, lo envuelve en Format, lo convierte a UTF8 y lo saca como std::string puro
+    auto set_safe = [](const char* texto) -> std::string {
+        return std::string(wxString::Format("%s", texto).ToUTF8().data());
+        };
+
+    // 3 - EQUIPO DE DESARROLLO
+    info.AddDeveloper(set_safe("Mauricio José Tobares (El Jefe) - Ideólogo y Director del Proyecto"));
+    info.AddDeveloper(set_safe("PJ (Programador Jefe Asistente IA) - Desarrollo Principal y Arquitectura"));
+    info.AddDeveloper(set_safe("IP (Ingeniero de Pruebas IA) - Aseguramiento de Calidad"));
+
+    // 4 - DOCUMENTADORES
+    info.AddDocWriter(set_safe("GP (Planificador de Proyectos IA) - Documentación Técnica y Planificación"));
+
+    // 5 - ARTISTAS
+    info.AddArtist(set_safe("DUXUI (Diseñador UX/UI IA) - Diseño de Interfaz y Experiencia de Usuario"));
+
+    // 6 - TRADUCCIÓN
+    info.AddTranslator(set_safe("Mauricio José Tobares - Único responsable (aunque todavía no traduje nada XD)"));
+
+    // 7 - COLABORADORES
+    info.AddCollaborator(set_safe("Amigo Tester #1"), set_safe("Valiosas pruebas y sugerencias de usabilidad."));
+    info.AddCollaborator(set_safe("Comunidad de Betas Anónimos"), set_safe("Por el feedback constructivo."));
+
+    // WEB
+    info.SetWebSite(
+        wxString::Format("https://github.com/TobaTobinTobinsky/ReinventProse_V3").ToUTF8().data(),
+        wxString::Format("Repositorio Oficial GitHub").ToUTF8().data()
+    );
+
+    // Lanzamos la ventana
+    ReinventProseAboutFrame* aboutFrame = new ReinventProseAboutFrame(this, info);
+    aboutFrame->Show();
 }
 
 void MainWindow::_on_toggle_pane(const wxString& pane_name, wxMenuItem* item) {

@@ -8,6 +8,10 @@
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/statbmp.h>
+#include <wx/mstream.h>
+
+// Resources
+#include "IconData.h"
 
 // --- Implementación de ReinventProseAboutInfo ---
 
@@ -16,8 +20,11 @@ void ReinventProseAboutInfo::SetName(const std::string& name) { m_name = name; }
 std::string ReinventProseAboutInfo::GetName() const { return m_name; }
 void ReinventProseAboutInfo::SetVersion(const std::string& version) { m_version = version; }
 std::string ReinventProseAboutInfo::GetVersion() const { return m_version; }
+
+// descripción como f"algo" en python pero en C++20 con std::format sería ideal, pero como no es tan común, lo dejamos simple.
 void ReinventProseAboutInfo::SetDescription(const std::string& description) { m_description = description; }
 std::string ReinventProseAboutInfo::GetDescription() const { return m_description; }
+
 void ReinventProseAboutInfo::SetCopyright(const std::string& copyright) { m_copyright = copyright; }
 std::string ReinventProseAboutInfo::GetCopyright() const { return m_copyright; }
 void ReinventProseAboutInfo::SetLicense(const std::string& license) { m_license = license; }
@@ -46,44 +53,71 @@ wxEND_EVENT_TABLE()
 
 ReinventProseAboutFrame::ReinventProseAboutFrame(wxWindow* parent, const ReinventProseAboutInfo& info)
     : wxFrame(parent, wxID_ANY, wxString::FromUTF8("Acerca de " + info.GetName()),
-        wxDefaultPosition, wxSize(600, 550),
+        wxDefaultPosition, wxSize(550, 600), // Tamaño ajustado para forzar 2 filas de pestañas
         wxDEFAULT_FRAME_STYLE | wxSTAY_ON_TOP),
     m_info(info)
 {
+    // --- FIJAR EL ICONO EN LA BARRA DE TÍTULO (Lo que faltaba) ---
+    wxMemoryInputStream stream(app_icon_data, app_icon_data_size);
+    wxImage img;
+    if (img.LoadFile(stream, wxBITMAP_TYPE_ICO)) {
+        wxIcon smallIcon;
+        smallIcon.CopyFromBitmap(wxBitmap(img));
+        this->SetIcon(smallIcon); // ¡Ahora sí aparece el robot en la esquina!
+    }
+
     _create_ui();
     _populate_data();
-
     this->CentreOnParent();
 }
 
 void ReinventProseAboutFrame::_create_ui() {
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
 
-    // Logo
-    wxBitmap logo_bmp = load_icon_bitmap(LOGO_FILENAME, LOGO_DISPLAY_SIZE);
-    m_logo_ctrl = new wxStaticBitmap(this, wxID_ANY, logo_bmp);
+    // --- LOGO REUTILIZADO ---
+    wxMemoryInputStream logoStream(app_icon_data, app_icon_data_size);
+    wxImage logoImg;
+
+    // Cargamos el logo desde el mismo array de bytes que el icono de ventana
+    if (logoImg.LoadFile(logoStream, wxBITMAP_TYPE_ICO)) {
+        // Lo reescalamos a un tamaño generoso para que se vea bien en el diálogo
+        wxBitmap logoBmp(logoImg.Rescale(120, 120, wxIMAGE_QUALITY_HIGH));
+        m_logo_ctrl = new wxStaticBitmap(this, wxID_ANY, logoBmp);
+    }
+    else {
+        m_logo_ctrl = new wxStaticBitmap(this, wxID_ANY, wxNullBitmap);
+    }
     main_sizer->Add(m_logo_ctrl, 0, wxALIGN_CENTER | wxALL, 15);
 
-    // Notebook
+    // --- NOTEBOOK MULTILÍNEA ---
+    // El flag wxNB_MULTILINE es el que permite las filas de pestañas.
+    // Seteamos un tamaño inicial pequeño para obligar al wrap.
     m_notebook = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxNB_MULTILINE);
 
-    // Crear pestañas usando la función auxiliar
     m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_general), "General");
     m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_license), "Licencia");
-    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_developers), "Desarrollo");
-    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_doc), "Documentación");
-    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_artists), "Arte");
+    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_developers), "Equipo de Desarrollo");
+    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_doc), "Documentadores");
+    m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_artists), "Artistas");
     m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_translators), "Traducción");
     m_notebook->AddPage(_create_tab_text_panel(m_notebook, &m_txt_collaborators), "Colaboradores");
 
     main_sizer->Add(m_notebook, 1, wxEXPAND | wxALL, 10);
 
-    // Botón cerrar
-    wxButton* close_btn = new wxButton(this, wxID_OK, "Cerrar");
-    close_btn->Bind(wxEVT_BUTTON, &ReinventProseAboutFrame::OnCloseButton, this);
+    // --- BOTÓN CERRAR (¡Ahora sí funciona!) ---
+    wxButton* close_btn = new wxButton(this, wxID_ANY, "Cerrar");
+
+    // Usamos una función Lambda de C++20 para decirle qué hacer al hacer clic
+    close_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
+        this->Destroy(); // Se auto-destruye (cierra la ventana)
+        });
+
     main_sizer->Add(close_btn, 0, wxALIGN_CENTER | wxBOTTOM, 10);
 
     SetSizer(main_sizer);
+
+    // Forzamos el tamaño del Frame
+    this->SetSize(wxSize(500, 550));
 }
 
 wxPanel* ReinventProseAboutFrame::_create_tab_text_panel(wxNotebook* parent, wxTextCtrl** ctrl_out) {
@@ -145,7 +179,7 @@ void ReinventProseAboutFrame::_populate_data() {
 }
 
 void ReinventProseAboutFrame::OnCloseButton(wxCommandEvent& event) {
-    this->Close(true);
+    this->Destroy(); // Lo destruye de la RAM sin piedad. Nada de pedir por favor.
 }
 
 void ReinventProseAboutFrame::OnSize(wxSizeEvent& event) {
