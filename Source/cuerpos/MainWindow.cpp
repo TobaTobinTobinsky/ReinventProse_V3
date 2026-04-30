@@ -1,7 +1,7 @@
 /**
- * Archivo: MainWindow.cpp
- * Descripción: Implementación completa de la ventana principal de ReinventProse 3.0.
- */
+* Archivo: MainWindow.cpp
+* Descripción: Implementación completa de la ventana principal de ReinventProse 3.0.
+*/
 
 #include "../encabezados/MainWindow.h"
 #include "../encabezados/AppHandler.h"
@@ -16,7 +16,6 @@
 #include "../encabezados/CustomAboutDialog.h"
 #include "../encabezados/Util.h"
 
-// include
 #include <wx/artprov.h>
 #include <wx/msgdlg.h>
 #include <wx/filedlg.h>
@@ -24,11 +23,9 @@
 #include <fstream>
 #include <sstream>
 #include <wx/mstream.h>
-#include <format> // La joya de C++20
-
 
 // Resources
-#include <IconData.h>
+#include "IconData.h"
 #include "NewBookData.h"
 #include "SaveData.h"
 #include "EditData.h"
@@ -36,9 +33,9 @@
 #include "UndoData.h"
 #include "RedoData.h"
 
- // ============================================================================
- // TABLA DE EVENTOS ESTÁTICA
- // ============================================================================
+// ============================================================================
+// TABLA DE EVENTOS ESTÁTICA
+// ============================================================================
 wxBEGIN_EVENT_TABLE(MainWindow, wxFrame)
 EVT_CLOSE(MainWindow::on_close)
 EVT_MENU(wxID_NEW, MainWindow::on_menu_new_book)
@@ -49,9 +46,18 @@ EVT_MENU(wxID_UNDO, MainWindow::on_undo_tool_click)
 EVT_MENU(wxID_REDO, MainWindow::on_redo_tool_click)
 EVT_MENU(wxID_EXIT, MainWindow::on_menu_exit)
 EVT_MENU(wxID_ABOUT, MainWindow::on_menu_about)
+EVT_MENU(MainWindow::ID_MENU_CONFIG, MainWindow::on_menu_configuraciones)
+EVT_MENU(MainWindow::ID_MENU_SKIN, MainWindow::on_menu_skin_editor)
 EVT_MENU(MainWindow::ID_EXPORT_TXT, MainWindow::on_export_txt)
 EVT_MENU(MainWindow::ID_EXPORT_DOCX, MainWindow::on_export_docx)
 EVT_MENU(MainWindow::ID_EXPORT_PDF, MainWindow::on_export_pdf)
+
+// Inteligencia de UI
+EVT_UPDATE_UI(wxID_SAVE, MainWindow::on_update_ui_save_button)
+EVT_UPDATE_UI(MainWindow::ID_TOOL_EDIT_BOOK, MainWindow::on_update_ui_needs_book)
+EVT_UPDATE_UI(MainWindow::ID_EXPORT_TXT, MainWindow::on_update_ui_needs_book)
+EVT_UPDATE_UI(MainWindow::ID_EXPORT_DOCX, MainWindow::on_update_ui_needs_book)
+EVT_UPDATE_UI(MainWindow::ID_EXPORT_PDF, MainWindow::on_update_ui_needs_book)
 wxEND_EVENT_TABLE()
 
 // ============================================================================
@@ -94,18 +100,13 @@ wxString MainWindow::_get_resource_path(const wxString& file_name) {
 }
 
 void MainWindow::_set_application_icon() {
-    // 1. Creamos el flujo de lectura apuntando al array que vive en IconData.h
     wxMemoryInputStream iconStream(app_icon_data, app_icon_data_size);
-
-    // 2. Cargamos la imagen especificando que el contenido es tipo ICO
     wxImage iconImage;
     if (iconImage.LoadFile(iconStream, wxBITMAP_TYPE_ICO)) {
-        // 3. Convertimos a icono y lo pegamos a la ventana
         wxIcon windowIcon;
         windowIcon.CopyFromBitmap(wxBitmap(iconImage));
         this->SetIcon(windowIcon);
     }
-    // Si falla, no hace nada (queda el genérico), pero no rompe por rutas inexistentes
 }
 
 wxBitmap MainWindow::_load_tool_icon(const wxString& icon_name, const wxSize& icon_size) {
@@ -119,14 +120,11 @@ void MainWindow::_create_status_bar() {
 }
 
 void MainWindow::_create_views() {
-    // Biblioteca
     m_library_view = new LibraryView(m_base_panel, m_app_handler);
     m_library_view->set_on_book_card_selected_callback([this](int id) { on_library_book_selected(id); });
 
-    // Detalles del libro
     m_book_details_view = new BookDetailsView(m_base_panel, m_app_handler);
 
-    // Lista de Capítulos
     m_chapter_list_view = new ChapterListView(m_base_panel, m_app_handler);
     m_chapter_list_view->set_on_chapter_selected_callback([this](std::optional<int> id) { on_main_window_chapter_selected(id); });
 
@@ -134,7 +132,6 @@ void MainWindow::_create_views() {
     m_aui_manager.AddPane(m_book_details_view, wxAuiPaneInfo().Name("details").Caption("Detalles del Libro").CenterPane().Hide());
     m_aui_manager.AddPane(m_chapter_list_view, wxAuiPaneInfo().Name("chapters").Caption("Capítulos").Left().BestSize(250, -1).Hide());
 
-    // SOLUCIÓN AL BUG: Cargar libros explícitamente al iniciar la app
     m_library_view->load_books();
 }
 
@@ -176,27 +173,15 @@ void MainWindow::_create_menu_bar() {
     mb->Append(fileMenu, "&Archivo");
 
     wxMenu* editMenu = new wxMenu();
-    editMenu->Append(wxID_UNDO, "Deshacer\tCtrl+Z");
-    editMenu->Append(wxID_REDO, "Rehacer\tCtrl+Y");
+    editMenu->Append(ID_MENU_CONFIG, "Configuraciones...", "Fuentes, Idioma y preferencias");
+    editMenu->Append(ID_MENU_SKIN, "Skin Editor (Beta)", "Personaliza el aspecto visual del programa");
     mb->Append(editMenu, "&Editar");
-
-    wxMenu* viewMenu = new wxMenu();
-    m_menu_view_library = viewMenu->AppendCheckItem(ID_VIEW_LIBRARY, "Panel Biblioteca");
-    m_menu_view_chapters = viewMenu->AppendCheckItem(ID_VIEW_CHAPTERS, "Panel Capítulos");
-    m_menu_view_details = viewMenu->AppendCheckItem(ID_VIEW_DETAILS, "Panel Detalles");
-    m_menu_view_editor = viewMenu->AppendCheckItem(ID_VIEW_EDITOR, "Panel Editor");
-    mb->Append(viewMenu, "&Ver");
 
     wxMenu* helpMenu = new wxMenu();
     helpMenu->Append(wxID_ABOUT, "Acerca de...");
     mb->Append(helpMenu, "Ayuda");
 
     SetMenuBar(mb);
-
-    Bind(wxEVT_MENU, [this](wxCommandEvent&) { _on_toggle_pane("library", m_menu_view_library); }, ID_VIEW_LIBRARY);
-    Bind(wxEVT_MENU, [this](wxCommandEvent&) { _on_toggle_pane("chapters", m_menu_view_chapters); }, ID_VIEW_CHAPTERS);
-    Bind(wxEVT_MENU, [this](wxCommandEvent&) { _on_toggle_pane("details", m_menu_view_details); }, ID_VIEW_DETAILS);
-    Bind(wxEVT_MENU, [this](wxCommandEvent&) { _on_toggle_pane("editor", m_menu_view_editor); }, ID_VIEW_EDITOR);
 }
 
 void MainWindow::_create_toolbar() {
@@ -213,7 +198,6 @@ wxBitmap MainWindow::_get_res_bmp(const unsigned char* data, unsigned int size) 
     wxMemoryInputStream stream(data, size);
     wxImage img;
     if (img.LoadFile(stream, wxBITMAP_TYPE_ANY)) {
-        // Rescatamos la imagen al tamaño estándar de la toolbar (24x24)
         return wxBitmap(img.Rescale(24, 24, wxIMAGE_QUALITY_HIGH));
     }
     return wxNullBitmap;
@@ -226,19 +210,14 @@ void MainWindow::_update_toolbar_state(int state) {
     tb->ClearTools();
     m_current_app_state = state;
 
-    // --- ESTADO: BIBLIOTECA ---
     if (state == STATE_LIBRARY) {
         tb->AddTool(wxID_NEW, "Nuevo", _get_res_bmp(new_book_data, new_book_data_size), "Crear nuevo libro");
     }
-
-    // --- ESTADO: DETALLES DEL LIBRO ---
     else if (state == STATE_DETAILS) {
         tb->AddTool(ID_TOOL_BACK_TO_LIBRARY, "Biblioteca", _get_res_bmp(library_data, library_data_size), "Volver a la biblioteca");
         tb->AddTool(ID_TOOL_EDIT_BOOK, "Editar", _get_res_bmp(edit_data, edit_data_size), "Editar capítulos");
         tb->AddTool(wxID_SAVE, "Guardar", _get_res_bmp(save_data, save_data_size), "Guardar cambios");
     }
-
-    // --- ESTADO: EDICIÓN DE CAPÍTULO ---
     else if (state == STATE_EDIT) {
         tb->AddTool(ID_TOOL_BACK_TO_LIBRARY, "Biblioteca", _get_res_bmp(library_data, library_data_size), "Volver a la biblioteca");
         tb->AddTool(wxID_SAVE, "Guardar", _get_res_bmp(save_data, save_data_size), "Guardar cambios");
@@ -247,7 +226,15 @@ void MainWindow::_update_toolbar_state(int state) {
         tb->AddTool(wxID_REDO, "Rehacer", _get_res_bmp(redo_data, redo_data_size), "Rehacer (Ctrl+Y)");
     }
 
-    tb->Realize(); // Refresca la toolbar visualmente
+    tb->Realize();
+}
+
+void MainWindow::on_update_ui_save_button(wxUpdateUIEvent& event) {
+    event.Enable(m_app_handler->is_application_dirty());
+}
+
+void MainWindow::on_update_ui_needs_book(wxUpdateUIEvent& event) {
+    event.Enable(m_current_book_id.has_value());
 }
 
 void MainWindow::set_dirty_status_in_title(bool is_dirty) {
@@ -346,13 +333,6 @@ bool MainWindow::_confirm_discard_changes() {
     return false;
 }
 
-void MainWindow::_update_view_menu_items_state() {
-    if (m_menu_view_library) m_menu_view_library->Check(m_aui_manager.GetPane("library").IsShown());
-    if (m_menu_view_chapters) m_menu_view_chapters->Check(m_aui_manager.GetPane("chapters").IsShown());
-    if (m_menu_view_details) m_menu_view_details->Check(m_aui_manager.GetPane("details").IsShown());
-    if (m_menu_view_editor) m_menu_view_editor->Check(m_aui_manager.GetPane("editor").IsShown());
-}
-
 // ============================================================================
 // MANEJADORES DE EVENTOS
 // ============================================================================
@@ -383,7 +363,6 @@ void MainWindow::on_show_library_as_center(wxCommandEvent& event, bool force_cle
 
     _update_toolbar_state(STATE_LIBRARY);
     set_dirty_status_in_title(m_app_handler->is_application_dirty());
-    _update_view_menu_items_state();
 
     m_aui_manager.Update();
 }
@@ -430,14 +409,12 @@ void MainWindow::on_library_book_selected(int selected_book_id) {
 
     m_app_handler->set_dirty(false);
     set_dirty_status_in_title(false);
-    _update_view_menu_items_state();
 
     m_aui_manager.Update();
 }
 
 void MainWindow::on_edit_book_tool_click(wxCommandEvent& event) {
     if (!m_current_book_id.has_value()) {
-        wxMessageBox("Por favor, seleccione un libro para editar sus capítulos.", "Aviso", wxOK | wxICON_INFORMATION, this);
         return;
     }
 
@@ -473,9 +450,34 @@ void MainWindow::on_edit_book_tool_click(wxCommandEvent& event) {
 
     _update_toolbar_state(STATE_EDIT);
     set_dirty_status_in_title(m_app_handler->is_application_dirty());
-    _update_view_menu_items_state();
 
     m_aui_manager.Update();
+}
+
+void MainWindow::on_save_current_book_tool_click(wxCommandEvent& event) {
+    if (!m_current_book_id.has_value()) return;
+
+    bool all_ok = true;
+
+    if (m_current_app_state == STATE_DETAILS && m_book_details_view && m_book_details_view->is_dirty()) {
+        if (!m_book_details_view->save_changes()) all_ok = false;
+    }
+    else if (m_current_app_state == STATE_EDIT && m_current_chapter_id.has_value()) {
+        if (m_chapter_content_view && m_chapter_content_view->is_dirty()) {
+            if (!m_chapter_content_view->save_changes()) all_ok = false;
+        }
+        if (m_abstract_idea_view && m_abstract_idea_view->is_dirty()) {
+            if (!m_abstract_idea_view->save_changes()) all_ok = false;
+        }
+    }
+
+    if (all_ok) {
+        m_app_handler->set_dirty(false);
+    }
+    else {
+        wxMessageBox("Algunos cambios no pudieron guardarse.", "Error", wxOK | wxICON_ERROR);
+    }
+    _reevaluate_global_dirty_state();
 }
 
 void MainWindow::on_main_window_chapter_selected(std::optional<int> chapter_id) {
@@ -515,32 +517,6 @@ void MainWindow::on_main_window_chapter_selected(std::optional<int> chapter_id) 
     _reevaluate_global_dirty_state();
 }
 
-void MainWindow::on_save_current_book_tool_click(wxCommandEvent& event) {
-    if (!m_current_book_id.has_value()) return;
-
-    bool all_ok = true;
-
-    if (m_current_app_state == STATE_DETAILS && m_book_details_view && m_book_details_view->is_dirty()) {
-        if (!m_book_details_view->save_changes()) all_ok = false;
-    }
-    else if (m_current_app_state == STATE_EDIT && m_current_chapter_id.has_value()) {
-        if (m_chapter_content_view && m_chapter_content_view->is_dirty()) {
-            if (!m_chapter_content_view->save_changes()) all_ok = false;
-        }
-        if (m_abstract_idea_view && m_abstract_idea_view->is_dirty()) {
-            if (!m_abstract_idea_view->save_changes()) all_ok = false;
-        }
-    }
-
-    if (all_ok) {
-        m_app_handler->set_dirty(false);
-    }
-    else {
-        wxMessageBox("Algunos cambios no pudieron guardarse.", "Error", wxOK | wxICON_ERROR);
-    }
-    _reevaluate_global_dirty_state();
-}
-
 void MainWindow::on_menu_new_book(wxCommandEvent& event) {
     if (m_app_handler->is_application_dirty() && !_confirm_discard_changes()) return;
 
@@ -555,6 +531,14 @@ void MainWindow::on_menu_new_book(wxCommandEvent& event) {
             on_library_book_selected(nid.value());
         }
     }
+}
+
+void MainWindow::on_menu_configuraciones(wxCommandEvent& event) {
+    wxMessageBox("El panel de Configuraciones estará disponible próximamente para gestionar fuentes, idiomas y el motor de base de datos.", "Configuración de Sistema");
+}
+
+void MainWindow::on_menu_skin_editor(wxCommandEvent& event) {
+    wxMessageBox("Skin Editor: En futuras actualizaciones podrás personalizar los colores RGBa de las tarjetas y la tipografía de la interfaz.", "Personalización Visual");
 }
 
 void MainWindow::on_export_txt(wxCommandEvent& event) {
@@ -617,7 +601,7 @@ void MainWindow::on_menu_about(wxCommandEvent& event) {
     info.SetVersion(wxString::Format("3.0.42 (Pure C++ Edition)").ToUTF8().data());
     info.SetCopyright(wxString::Format("(C) 2023-2024 Mauricio José Tobares. Todos los derechos reservados.").ToUTF8().data());
 
-    // 1 - GENERAL (El que sabíamos que funcionaba)
+    // 1 - GENERAL
     wxString desc = wxString::Format(
         "Una aplicación de escritorio de alto rendimiento para la gestión integral "
         "y organización de proyectos de escritura creativa.\n\n"
@@ -629,7 +613,7 @@ void MainWindow::on_menu_about(wxCommandEvent& event) {
     );
     info.SetDescription(desc.ToUTF8().data());
 
-    // 2 - LICENCIA (Formateado forzoso)
+    // 2 - LICENCIA
     wxString lic_text = wxString::Format(
         "MIT License\n\n"
         "Copyright (c) 2023-2024 Mauricio José Tobares\n\n"
@@ -651,8 +635,6 @@ void MainWindow::on_menu_about(wxCommandEvent& event) {
     );
     info.SetLicense(lic_text.ToUTF8().data());
 
-    // --- LA LAMBDA BLINDADA ---
-    // Agarra cualquier texto, lo envuelve en Format, lo convierte a UTF8 y lo saca como std::string puro
     auto set_safe = [](const char* texto) -> std::string {
         return std::string(wxString::Format("%s", texto).ToUTF8().data());
         };
@@ -675,25 +657,19 @@ void MainWindow::on_menu_about(wxCommandEvent& event) {
     info.AddCollaborator(set_safe("Amigo Tester #1"), set_safe("Valiosas pruebas y sugerencias de usabilidad."));
     info.AddCollaborator(set_safe("Comunidad de Betas Anónimos"), set_safe("Por el feedback constructivo."));
 
-    // WEB
     info.SetWebSite(
         wxString::Format("https://github.com/TobaTobinTobinsky/ReinventProse_V3").ToUTF8().data(),
         wxString::Format("Repositorio Oficial GitHub").ToUTF8().data()
     );
 
-    // Lanzamos la ventana
     ReinventProseAboutFrame* aboutFrame = new ReinventProseAboutFrame(this, info);
     aboutFrame->Show();
 }
 
-void MainWindow::_on_toggle_pane(const wxString& pane_name, wxMenuItem* item) {
-    wxAuiPaneInfo& p = m_aui_manager.GetPane(pane_name);
-    if (p.IsOk()) {
-        p.Show(!p.IsShown());
-        m_aui_manager.Update();
-        if (item) item->Check(p.IsShown());
-    }
-}
+void MainWindow::on_menu_exit(wxCommandEvent& e) { this->Close(); }
+void MainWindow::on_back_to_library_tool_click(wxCommandEvent& e) { on_show_library_as_center(e); }
+void MainWindow::on_undo_tool_click(wxCommandEvent& e) { if (m_chapter_content_view) m_chapter_content_view->force_save_if_dirty(); }
+void MainWindow::on_redo_tool_click(wxCommandEvent& e) {}
 
 void MainWindow::on_close(wxCloseEvent& event) {
     _save_state();
@@ -704,14 +680,8 @@ void MainWindow::on_close(wxCloseEvent& event) {
     this->Destroy();
 }
 
-// Redirecciones
-void MainWindow::on_menu_exit(wxCommandEvent& e) { this->Close(); }
-void MainWindow::on_back_to_library_tool_click(wxCommandEvent& e) { on_show_library_as_center(e); }
-void MainWindow::on_undo_tool_click(wxCommandEvent& e) { if (m_chapter_content_view) m_chapter_content_view->force_save_if_dirty(); }
-void MainWindow::on_redo_tool_click(wxCommandEvent& e) {}
-
 // ============================================================================
-// PERSISTENCIA Y ARCHIVOS
+// PERSISTENCIA Y CONFIGURACIÓN
 // ============================================================================
 
 wxString MainWindow::_get_config_path(const wxString& filename) {
@@ -738,5 +708,4 @@ void MainWindow::_load_state() {
         m_aui_manager.LoadPerspective(wxString::FromUTF8(ss.str().c_str()));
         f.close();
     }
-    _update_view_menu_items_state();
 }

@@ -46,7 +46,6 @@ private:
     void _create_status_bar();
     void _create_views();
     void _ensure_edit_notebook();
-    wxBitmap _load_tool_icon(const wxString& icon_name, const wxSize& icon_size);
     wxBitmap _get_res_bmp(const unsigned char* data, unsigned int size);
 
     // --- Lógica de Interfaz y Estados ---
@@ -58,13 +57,13 @@ private:
     void _reevaluate_global_dirty_state();
     void _clear_chapter_views_and_selection();
     bool _confirm_discard_changes();
-    void _update_view_menu_items_state();
 
     // --- Persistencia y Archivos ---
     wxString _get_config_path(const wxString& filename);
     void _save_state();
     void _load_state();
     wxString _get_resource_path(const wxString& file_name);
+    wxBitmap _load_tool_icon(const wxString& icon_name, const wxSize& icon_size);
 
     // --- Manejadores de Eventos de Menú y Herramientas ---
     void on_menu_new_book(wxCommandEvent& event);
@@ -76,14 +75,21 @@ private:
     void on_menu_exit(wxCommandEvent& event);
     void on_menu_about(wxCommandEvent& event);
 
+    // Nuevos manejadores Editar
+    void on_menu_configuraciones(wxCommandEvent& event);
+    void on_menu_skin_editor(wxCommandEvent& event);
+
     // Exportación
     void on_export_txt(wxCommandEvent& event);
     void on_export_docx(wxCommandEvent& event);
     void on_export_pdf(wxCommandEvent& event);
 
+    // Inteligencia de UI
+    void on_update_ui_save_button(wxUpdateUIEvent& event);
+    void on_update_ui_needs_book(wxUpdateUIEvent& event);
+
     // Ventana y AUI
     void on_close(wxCloseEvent& event);
-    void _on_toggle_pane(const wxString& pane_name, wxMenuItem* item);
     void on_library_book_selected(int selected_book_id);
     void on_show_library_as_center(wxCommandEvent& event, bool force_clean = false);
 
@@ -108,12 +114,6 @@ private:
     AbstractIdeaView* m_abstract_idea_view;
     ConcreteIdeaView* m_concrete_idea_view;
 
-    // Items de menú para el "Ver"
-    wxMenuItem* m_menu_view_library;
-    wxMenuItem* m_menu_view_chapters;
-    wxMenuItem* m_menu_view_details;
-    wxMenuItem* m_menu_view_editor;
-
     // Constantes
     const wxString CONFIG_DIR = ".reinventprose_v3_config";
     const wxString PERSP_FILE = "layout.txt";
@@ -125,12 +125,8 @@ private:
         ID_EXPORT_TXT,
         ID_EXPORT_DOCX,
         ID_EXPORT_PDF,
-        ID_UNDO,
-        ID_REDO,
-        ID_VIEW_LIBRARY,
-        ID_VIEW_CHAPTERS,
-        ID_VIEW_DETAILS,
-        ID_VIEW_EDITOR
+        ID_MENU_CONFIG,
+        ID_MENU_SKIN
     };
 
     enum {
