@@ -1,10 +1,5 @@
 /*
 * File Name: ConcreteIdeaView.h
-* Descripción: Vista para gestionar ideas concretas asociadas a un capítulo como tarjetas dinámicas (Post-Its).
-* Author: AutoDoc AI (Sugerido por el Jefe)
-* Date: 07/06/2025
-* Version: 2.0.0
-* License: MIT License
 */
 
 #ifndef CONCRETEIDEAVIEW_H
@@ -16,33 +11,25 @@
 #include <string>
 #include <optional>
 #include <functional>
-#include "DBManager.h" // Para el tipo estricto DBRow
 
 class AppHandler;
 
-// --- Diálogo emergente para ver, editar o borrar una idea (La Ventanita) ---
+// Diálogo de edición
 class IdeaDetailDialog : public wxDialog {
 public:
     IdeaDetailDialog(wxWindow* parent, const std::string& initial_text);
-
     std::string GetText() const;
-    bool IsDeleted() const { return m_deleted; }
-
 private:
-    void OnDelete(wxCommandEvent& event);
-
     wxTextCtrl* m_text_ctrl;
-    bool m_deleted;
 };
 
-
-// --- Componente Gráfico: La Tarjeta de Idea Individual (El Post-It) ---
+// Tarjeta individual
 class ConcreteIdeaCard : public wxPanel {
 public:
-    ConcreteIdeaCard(wxWindow* parent, int id, const std::string& text, std::function<void(int, std::string)> on_click);
-
-    int GetIdeaId() const { return m_id; }
-    std::string GetIdeaText() const { return m_text; }
+    ConcreteIdeaCard(wxWindow* parent, int id, const std::string& text, bool is_first, bool is_last,
+        std::function<void(int, std::string)> on_read,
+        std::function<void(int)> on_delete,
+        std::function<void(int, bool)> on_move);
 
 private:
     void OnPaint(wxPaintEvent& event);
@@ -50,47 +37,32 @@ private:
 
     int m_id;
     std::string m_text;
-    std::function<void(int, std::string)> m_on_click;
+    bool m_is_first, m_is_last;
+    std::function<void(int, std::string)> m_on_read;
+    std::function<void(int)> m_on_delete;
+    std::function<void(int, bool)> m_on_move;
 };
 
-
-// --- Panel Contenedor Principal (El Tablero) ---
-// Como queremos que los "post-its" fluyan, usamos un Panel que soporta WrapSizer
+// Tablero principal
 class ConcreteIdeaView : public wxPanel {
 public:
-    /**
-     * Inicializa el tablero de ideas concretas.
-     */
     ConcreteIdeaView(wxWindow* parent, AppHandler* app_handler);
-
-    /**
-     * Carga las tarjetas de ideas para un capítulo específico.
-     */
     void load_ideas(std::optional<int> chapter_id);
-
-    /**
-     * Bloquea o desbloquea el tablero según si hay o no un capítulo cargado.
-     */
     void enable_view(bool enable);
 
 private:
-    // Construcción visual
     void _create_controls();
     void _layout_controls();
     void _update_button_states();
-
-    // Eventos
+    void _on_delete_requested(int id);
     void OnAddIdea(wxCommandEvent& event);
-    void OnCardClicked(int id, std::string text);
+    void OnCardReadClicked(int id, std::string text);
 
-    // Datos y Control
     AppHandler* m_app_handler;
     std::optional<int> m_chapter_id;
-
-    // Controles UI
     wxStaticText* m_info_label;
     wxButton* m_add_button;
     wxWrapSizer* m_wrap_sizer;
 };
 
-#endif // CONCRETEIDEAVIEW_H
+#endif

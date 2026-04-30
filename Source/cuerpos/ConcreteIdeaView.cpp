@@ -1,6 +1,6 @@
 /**
 * File Name: ConcreteIdeaView.cpp
-* Descripción: Implementación del tablero de ideas (Tarjetas interactivas con UTF-8).
+* Descripción: Implementación del tablero de ideas con diseño de alta gama y lógica de reordenamiento.
 */
 
 #include "../encabezados/ConcreteIdeaView.h"
@@ -9,16 +9,92 @@
 #include <wx/msgdlg.h>
 #include <wx/graphics.h>
 #include <wx/dcbuffer.h>
+#include <wx/tokenzr.h>
 
 // ============================================================================
-// CLASE 1: TARJETA DE IDEA CONCRETA (El Post-It)
+// AUXILIAR: FUNCIÓN DE RENDERIZADO GLOSSY 3D
 // ============================================================================
 
-ConcreteIdeaCard::ConcreteIdeaCard(wxWindow* parent, int id, const std::string& text, std::function<void(int, std::string)> on_click)
-    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(200, 120), wxBORDER_NONE),
-    m_id(id), m_text(text), m_on_click(on_click)
+void DrawGlossyComponent(
+    wxGraphicsContext* gc,
+    double x,
+    double y,
+    double w,
+    double h,
+    double r,
+    wxColour baseColor,
+    wxString label,
+    bool isDarkText)
 {
-    // Fundamental para evitar parpadeos y permitir dibujos vectoriales limpios
+    // 1. MARCO METÁLICO (Bisel exterior)
+    wxGraphicsBrush bezel = gc->CreateLinearGradientBrush(
+        x, y,
+        x + w, y + h,
+        wxColour(255, 255, 255),
+        wxColour(150, 150, 150)
+    );
+    gc->SetBrush(bezel);
+    gc->SetPen(wxPen(wxColour(100, 100, 100), 1));
+    gc->DrawRoundedRectangle(x, y, w, h, r);
+
+    // 2. CUERPO DE CRISTAL (Color Base con profundidad)
+    double m = 1.5;
+    wxGraphicsBrush body = gc->CreateLinearGradientBrush(
+        x, y,
+        x, y + h,
+        baseColor,
+        baseColor.ChangeLightness(60)
+    );
+    gc->SetBrush(body);
+    gc->SetPen(wxPen(baseColor.ChangeLightness(40), 1));
+    gc->DrawRoundedRectangle(x + m, y + m, w - (m * 2), h - (m * 2), r - 1);
+
+    // 3. BRILLO SUPERIOR (Efecto Glass)
+    wxGraphicsPath gloss = gc->CreatePath();
+    gloss.AddRoundedRectangle(x + m + 1, y + m + 1, w - (m * 2) - 2, (h / 2) - 1, r - 2);
+
+    wxGraphicsBrush glossBrush = gc->CreateLinearGradientBrush(
+        x, y,
+        x, y + h / 2,
+        wxColour(255, 255, 255, 160),
+        wxColour(255, 255, 255, 20)
+    );
+    gc->SetBrush(glossBrush);
+    gc->FillPath(gloss);
+
+    // 4. ETIQUETA DE TEXTO
+    gc->SetFont(
+        wxFont(9, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD),
+        isDarkText ? *wxBLACK : *wxWHITE
+    );
+
+    double tw, th;
+    gc->GetTextExtent(label, &tw, &th);
+    gc->DrawText(label, x + (w - tw) / 2, y + (h - th) / 2);
+}
+
+// ============================================================================
+// CLASE 1: TARJETA DE IDEA CONCRETA (ConcreteIdeaCard)
+// ============================================================================
+
+ConcreteIdeaCard::ConcreteIdeaCard(
+    wxWindow* parent,
+    int id,
+    const std::string& text,
+    bool is_first,
+    bool is_last,
+    std::function<void(int, std::string)> on_read,
+    std::function<void(int)> on_delete,
+    std::function<void(int, bool)> on_move)
+    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(195, 170), wxBORDER_NONE),
+    m_id(id),
+    m_text(text),
+    m_is_first(is_first),
+    m_is_last(is_last),
+    m_on_read(on_read),
+    m_on_delete(on_delete),
+    m_on_move(on_move)
+{
     SetBackgroundStyle(wxBG_STYLE_PAINT);
 
     Bind(wxEVT_PAINT, &ConcreteIdeaCard::OnPaint, this);
@@ -29,77 +105,216 @@ void ConcreteIdeaCard::OnPaint(wxPaintEvent& event) {
     wxAutoBufferedPaintDC dc(this);
     std::unique_ptr<wxGraphicsContext> gc(wxGraphicsContext::Create(dc));
 
-    if (!gc) return;
+    if (!gc)
+    {
+        return;
+    }
 
     wxSize sz = GetClientSize();
 
-    // Dibujo del fondo (Amarillo Pastel para simular post-it)
-    gc->SetBrush(wxBrush(wxColour(255, 255, 180)));
-    gc->SetPen(wxPen(wxColour(200, 200, 100), 1));
-    gc->DrawRoundedRectangle(2, 2, sz.x - 4, sz.y - 4, 6); // Bordes ligeramente redondeados
+    // A. FONDO MIMÉTICO (Transparencia con el tablero)
+    gc->SetBrush(wxBrush(GetParent()->GetBackgroundColour()));
+    gc->SetPen(*wxTRANSPARENT_PEN);
+    gc->DrawRectangle(0, 0, sz.x, sz.y);
 
-    // Dibujo del texto con soporte UTF-8
-    gc->SetFont(wxFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL), *wxBLACK);
-    wxString display_text = wxString::FromUTF8(m_text);
+    // B. EL MARCO DORADO (Técnica de capas para borde de 3px)
+    int vis_h = sz.y - 25;
 
-    // Si la idea es muy larga, la truncamos visualmente en la tarjeta
-    if (display_text.Length() > 90) {
-        display_text = display_text.Left(87) + "...";
+    wxGraphicsBrush goldBrush = gc->CreateLinearGradientBrush(
+        0, 0,
+        sz.x, vis_h,
+        wxColour(255, 215, 0),
+        wxColour(184, 134, 11)
+    );
+
+    gc->SetBrush(goldBrush);
+    gc->SetPen(wxPen(wxColour(139, 101, 8), 1));
+    gc->DrawRoundedRectangle(2, 2, sz.x - 4, vis_h - 4, 8);
+
+    gc->SetBrush(*wxWHITE_BRUSH);
+    gc->SetPen(wxPen(wxColour(200, 200, 200), 1));
+    gc->DrawRoundedRectangle(5, 5, sz.x - 10, vis_h - 10, 6);
+
+    // C. LETRA GIGANTE (Marca de agua decorativa)
+    if (!m_text.empty())
+    {
+        wxString first = wxString::FromUTF8(m_text.substr(0, 1)).Upper();
+
+        gc->SetFont(
+            wxFont(vis_h - 20, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD),
+            wxColour(250, 250, 250)
+        );
+
+        double tw, th;
+        gc->GetTextExtent(first, &tw, &th);
+        gc->DrawText(first, (sz.x - tw) / 2, (vis_h - th) / 2);
     }
 
-    // Dibujamos el texto con margen interno
-    gc->DrawText(display_text, 10, 10, sz.x - 20);
+    // D. ALGORITMO DE WORD WRAPPING (Inteligencia de texto)
+    gc->SetFont(
+        wxFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL),
+        *wxBLACK
+    );
+
+    wxString full_text = wxString::FromUTF8(m_text);
+    wxStringTokenizer tk(full_text, " \t\r\n");
+    wxString currentLine = "";
+    double y_cursor = 20;
+
+    while (tk.HasMoreTokens())
+    {
+        wxString word = tk.GetNextToken();
+        wxString testLine = currentLine.IsEmpty() ? word : currentLine + " " + word;
+
+        double tw, th;
+        gc->GetTextExtent(testLine, &tw, &th);
+
+        if (tw > sz.x - 30)
+        {
+            gc->DrawText(currentLine, 15, y_cursor);
+            y_cursor += 14;
+            currentLine = word;
+
+            if (y_cursor > vis_h - 30)
+            {
+                currentLine = "...";
+                break;
+            }
+        }
+        else
+        {
+            currentLine = testLine;
+        }
+    }
+    gc->DrawText(currentLine, 15, y_cursor);
+
+    // E. BOTONES PROCEDURALES (Glossy Pastel)
+    // Argumentos: gc, x, y, w, h, r, baseColor, label, isDarkText
+    DrawGlossyComponent(gc.get(), 10, sz.y - 32, 55, 24, 6, wxColour(144, 238, 144), "Leer", true);
+    DrawGlossyComponent(gc.get(), 70, sz.y - 32, 55, 24, 6, wxColour(173, 216, 230), "Borrar", true);
+
+    // F. CONTADOR (Cristal Rojo - Límite 200)
+    int count = (int)m_text.length();
+    int display_count = count > 200 ? 200 : count;
+
+    // FIX: Se agregó el noveno argumento (false) para isDarkText
+    DrawGlossyComponent(
+        gc.get(),
+        sz.x - 55,
+        sz.y - 32,
+        45,
+        24,
+        6,
+        wxColour(150, 0, 0),
+        wxString::Format("%03d", display_count),
+        false
+    );
+
+    // G. BOTONES DE MOVIMIENTO LATERAL (50% Desbordados)
+    if (!m_is_first)
+    {
+        DrawGlossyComponent(gc.get(), -8, (vis_h / 2) - 15, 25, 30, 4, wxColour(200, 200, 200), "<", true);
+    }
+
+    if (!m_is_last)
+    {
+        DrawGlossyComponent(gc.get(), sz.x - 17, (vis_h / 2) - 15, 25, 30, 4, wxColour(200, 200, 200), ">", true);
+    }
 }
 
-void ConcreteIdeaCard::OnLeftDown(wxMouseEvent& event) {
-    if (m_on_click) m_on_click(m_id, m_text);
+void ConcreteIdeaCard::OnLeftDown(wxMouseEvent& event)
+{
+    wxPoint pos = event.GetPosition();
+    wxSize sz = GetClientSize();
+    int vh = sz.y - 25;
+
+    // Clic en el botón "Leer"
+    if (pos.x >= 10 && pos.x <= 65 && pos.y >= sz.y - 32 && pos.y <= sz.y - 8)
+    {
+        m_on_read(m_id, m_text);
+    }
+    // Clic en el botón "Borrar"
+    else if (pos.x >= 70 && pos.x <= 125 && pos.y >= sz.y - 32 && pos.y <= sz.y - 8)
+    {
+        m_on_delete(m_id);
+    }
+    // Clic en la flecha izquierda
+    else if (!m_is_first && pos.x >= -8 && pos.x <= 17 && pos.y >= (vh / 2) - 15 && pos.y <= (vh / 2) + 15)
+    {
+        m_on_move(m_id, false);
+    }
+    // Clic en la flecha derecha
+    else if (!m_is_last && pos.x >= sz.x - 17 && pos.x <= sz.x + 8 && pos.y >= (vh / 2) - 15 && pos.y <= (vh / 2) + 15)
+    {
+        m_on_move(m_id, true);
+    }
+    else
+    {
+        event.Skip();
+    }
 }
 
 // ============================================================================
-// CLASE 2: DIÁLOGO EMERGENTE DE EDICIÓN (La Ventanita)
+// CLASE 2: DIÁLOGO DE EDICIÓN (IdeaDetailDialog)
 // ============================================================================
 
 IdeaDetailDialog::IdeaDetailDialog(wxWindow* parent, const std::string& initial_text)
-    : wxDialog(parent, wxID_ANY, "Detalle de Idea Concreta", wxDefaultPosition, wxSize(400, 300)),
-    m_deleted(false)
+    : wxDialog(parent, wxID_ANY, "Editar Idea", wxDefaultPosition, wxSize(400, 350))
 {
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
 
-    // TextCtrl multilínea donde se muestra la idea completa
-    m_text_ctrl = new wxTextCtrl(this, wxID_ANY, wxString::FromUTF8(initial_text),
-        wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE);
+    m_text_ctrl = new wxTextCtrl(
+        this, wxID_ANY,
+        wxString::FromUTF8(initial_text),
+        wxDefaultPosition, wxDefaultSize,
+        wxTE_MULTILINE
+    );
+    m_text_ctrl->SetMaxLength(200);
 
-    // Configuración visual: fuente un poco más grande
-    m_text_ctrl->SetFont(wxFont(11, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL));
     main_sizer->Add(m_text_ctrl, 1, wxEXPAND | wxALL, 15);
 
-    // Botones de acción
+    // Fila del contador
+    wxBoxSizer* counter_sizer = new wxBoxSizer(wxHORIZONTAL);
+    counter_sizer->AddStretchSpacer(1);
+
+    wxStaticText* label_count = new wxStaticText(
+        this, wxID_ANY,
+        wxString::Format("%zu / 200", initial_text.length())
+    );
+    label_count->SetFont(wxFont(9, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_ITALIC, wxFONTWEIGHT_BOLD));
+    label_count->SetForegroundColour(wxColour(100, 100, 100));
+
+    counter_sizer->Add(label_count, 0, wxRIGHT, 20);
+    main_sizer->Add(counter_sizer, 0, wxEXPAND);
+
+    // Botonera inferior
     wxBoxSizer* btn_sizer = new wxBoxSizer(wxHORIZONTAL);
-    wxButton* save_btn = new wxButton(this, wxID_OK, "Guardar Cambios");
-    wxButton* del_btn = new wxButton(this, wxID_ANY, "Eliminar Idea");
-    wxButton* cancel_btn = new wxButton(this, wxID_CANCEL, "Cerrar");
+    btn_sizer->Add(new wxButton(this, wxID_OK, "Guardar"), 0, wxRIGHT, 10);
+    btn_sizer->Add(new wxButton(this, wxID_CANCEL, "Cerrar"), 0);
 
-    // Botón eliminar lleva lógica especial
-    del_btn->Bind(wxEVT_BUTTON, &IdeaDetailDialog::OnDelete, this);
+    main_sizer->Add(btn_sizer, 0, wxALIGN_CENTER | wxBOTTOM | wxTOP, 15);
 
-    btn_sizer->Add(save_btn, 0, wxRIGHT, 10);
-    btn_sizer->Add(del_btn, 0, wxRIGHT, 10);
-    btn_sizer->Add(cancel_btn, 0);
+    // Actualización dinámica del contador
+    m_text_ctrl->Bind(wxEVT_TEXT, [label_count](wxCommandEvent& ev) {
+        int len = (int)ev.GetString().Length();
+        label_count->SetLabel(wxString::Format("%d / 200", len));
 
-    main_sizer->Add(btn_sizer, 0, wxALIGN_CENTER | wxBOTTOM, 15);
+        if (len >= 200)
+        {
+            label_count->SetForegroundColour(*wxRED);
+        }
+        else
+        {
+            label_count->SetForegroundColour(wxColour(100, 100, 100));
+        }
+        });
+
     SetSizer(main_sizer);
+    CentreOnParent();
 }
 
-void IdeaDetailDialog::OnDelete(wxCommandEvent& event) {
-    // Doble check antes de volar la idea
-    if (wxMessageBox("¿Está seguro que desea eliminar permanentemente esta idea?", "Confirmar Eliminación", wxYES_NO | wxICON_WARNING | wxNO_DEFAULT) == wxYES) {
-        m_deleted = true;
-        EndModal(wxID_OK); // Salimos del diálogo marcando que se aceptó la acción
-    }
-}
-
-std::string IdeaDetailDialog::GetText() const {
-    // Aseguramos devolver el texto en UTF-8 para la base de datos
+std::string IdeaDetailDialog::GetText() const
+{
     return m_text_ctrl->GetValue().ToUTF8().data();
 }
 
@@ -108,130 +323,147 @@ std::string IdeaDetailDialog::GetText() const {
 // ============================================================================
 
 ConcreteIdeaView::ConcreteIdeaView(wxWindow* parent, AppHandler* app_handler)
-    : wxPanel(parent, wxID_ANY), m_app_handler(app_handler), m_chapter_id(std::nullopt)
+    : wxPanel(parent, wxID_ANY),
+    m_app_handler(app_handler),
+    m_chapter_id(std::nullopt)
 {
-    SetBackgroundColour(wxColour(245, 245, 245)); // Gris clarito de fondo de tablero
+    SetBackgroundColour(wxColour(245, 245, 245));
     _create_controls();
     _layout_controls();
     load_ideas(std::nullopt);
 }
 
-void ConcreteIdeaView::_create_controls() {
-    m_info_label = new wxStaticText(this, wxID_ANY, "Tablero de Ideas Concretas:");
-    m_info_label->SetFont(wxFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_ITALIC, wxFONTWEIGHT_BOLD));
+void ConcreteIdeaView::_create_controls()
+{
+    m_info_label = new wxStaticText(this, wxID_ANY, "Ideas del Capítulo:");
 
-    m_add_button = new wxButton(this, wxID_ANY, "+ Crear Nueva Idea");
+    m_add_button = new wxButton(this, wxID_ANY, "+ Nueva Idea (Máx 200)");
     m_add_button->Bind(wxEVT_BUTTON, &ConcreteIdeaView::OnAddIdea, this);
 
-    // Este Sizer es la clave: Acomoda los elementos y hace salto de línea si no caben (Wrap)
-    m_wrap_sizer = new wxWrapSizer(wxHORIZONTAL);
+    m_wrap_sizer = new wxWrapSizer(wxHORIZONTAL, wxREMOVE_LEADING_SPACES);
 }
 
-void ConcreteIdeaView::_layout_controls() {
+void ConcreteIdeaView::_layout_controls()
+{
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
 
     main_sizer->Add(m_info_label, 0, wxALL, 10);
     main_sizer->Add(m_add_button, 0, wxLEFT | wxRIGHT | wxBOTTOM, 10);
-
-    // Agregamos el wrap sizer al panel principal
     main_sizer->Add(m_wrap_sizer, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10);
 
     this->SetSizer(main_sizer);
 }
 
-void ConcreteIdeaView::_update_button_states() {
-    // Solo permitimos agregar ideas si hay un capítulo enfocado
-    bool can_add = this->IsEnabled() && m_chapter_id.has_value();
-    m_add_button->Enable(can_add);
-}
-
-void ConcreteIdeaView::load_ideas(std::optional<int> id) {
-    // Evitamos parpadeos mientras redibujamos el tablero
+void ConcreteIdeaView::load_ideas(std::optional<int> id)
+{
     this->Freeze();
-
     m_chapter_id = id;
-
-    // Destruimos todas las tarjetas viejas
     m_wrap_sizer->Clear(true);
 
-    if (id.has_value()) {
-        m_info_label->SetLabel("Tablero de Ideas - Haz clic para editar");
-
-        // Consultamos al motor de base de datos
+    if (id.has_value())
+    {
         auto ideas = m_app_handler->get_concrete_ideas_for_chapter(id.value());
-        for (const auto& row : ideas) {
-            int idea_id = (int)std::get<long long>(row.at("id"));
-            std::string text = std::get<std::string>(row.at("idea"));
 
-            // Instanciamos el post-it. Le pasamos un callback lambda que se dispara al hacerle clic.
-            ConcreteIdeaCard* card = new ConcreteIdeaCard(this, idea_id, text,
-                [this](int iid, std::string itxt) { this->OnCardClicked(iid, itxt); });
+        for (size_t i = 0; i < ideas.size(); ++i)
+        {
+            int iid = (int)std::get<long long>(ideas[i].at("id"));
+            std::string txt = std::get<std::string>(ideas[i].at("idea"));
 
-            // Agregamos la tarjeta al WrapSizer con 5px de separación
-            m_wrap_sizer->Add(card, 0, wxALL, 5);
+            // Calculamos IDs de los vecinos para la lógica de Swap
+            int nid = (i < ideas.size() - 1) ? (int)std::get<long long>(ideas[i + 1].at("id")) : -1;
+            int pid = (i > 0) ? (int)std::get<long long>(ideas[i - 1].at("id")) : -1;
+
+            ConcreteIdeaCard* card = new ConcreteIdeaCard(
+                this, iid, txt,
+                (i == 0), (i == ideas.size() - 1),
+                [this](int id_read, std::string text_read) {
+                    OnCardReadClicked(id_read, text_read);
+                },
+                [this](int id_del) {
+                    _on_delete_requested(id_del);
+                },
+                [this, pid, nid](int id_move, bool right) {
+                    int target = right ? nid : pid;
+                    if (target != -1 && m_app_handler->swap_concrete_idea_positions(id_move, target))
+                    {
+                        load_ideas(m_chapter_id);
+                    }
+                }
+            );
+
+            m_wrap_sizer->Add(card, 0, wxALL, 15);
         }
-    }
-    else {
-        m_info_label->SetLabel("Seleccione un capítulo para ver o crear sus ideas concretas.");
     }
 
     _update_button_states();
-
     this->Layout();
-    this->Thaw(); // Aplicamos los cambios visuales
+    this->Thaw();
 }
 
-void ConcreteIdeaView::OnAddIdea(wxCommandEvent& event) {
-    if (!m_chapter_id.has_value() || !this->IsEnabled()) return;
+void ConcreteIdeaView::_on_delete_requested(int id)
+{
+    wxMessageDialog dlg(this, "¿Borrar permanentemente esta nota?", "Aviso", wxYES_NO | wxICON_WARNING);
 
-    // Abrimos un diálogo estándar, con propiedad multilínea
-    wxTextEntryDialog dlg(this, "Escribe tu idea (sé concreto pero no escatimes renglones):", "Nueva Idea", "", wxOK | wxCANCEL | wxTE_MULTILINE);
-
-    if (dlg.ShowModal() == wxID_OK) {
-        wxString text = dlg.GetValue().Trim(true).Trim(false);
-        if (!text.IsEmpty()) {
-
-            // Convertir de wxString (interfaz) a std::string UTF-8 (Base de Datos)
-            std::string text_utf8 = text.ToUTF8().data();
-
-            if (m_app_handler->add_concrete_idea_for_chapter(m_chapter_id.value(), wxString::FromUTF8(text_utf8))) {
-                load_ideas(m_chapter_id); // Refrescar el tablero para que aparezca la nueva
-                m_app_handler->set_dirty(true); // Prender asterisco
-            }
-            else {
-                wxMessageBox("Hubo un fallo al intentar registrar la idea en la base de datos.", "Error de Motor SQL", wxOK | wxICON_ERROR);
-            }
+    if (dlg.ShowModal() == wxID_YES)
+    {
+        if (m_app_handler->delete_concrete_idea_by_id(id))
+        {
+            m_app_handler->set_dirty(true);
+            load_ideas(m_chapter_id);
         }
     }
 }
 
-void ConcreteIdeaView::OnCardClicked(int id, std::string text) {
-    // Invocamos nuestra "Ventanita" emergente
+void ConcreteIdeaView::OnCardReadClicked(int id, std::string text)
+{
     IdeaDetailDialog dlg(this, text);
 
-    if (dlg.ShowModal() == wxID_OK) {
-        // ¿El usuario presionó el botón rojo de Eliminar?
-        if (dlg.IsDeleted()) {
-            if (m_app_handler->delete_concrete_idea_by_id(id)) {
+    if (dlg.ShowModal() == wxID_OK)
+    {
+        wxString secure_text = wxString::Format("%s", dlg.GetText());
+
+        if (secure_text.ToStdString() != text)
+        {
+            if (m_app_handler->update_concrete_idea_text(id, secure_text))
+            {
                 m_app_handler->set_dirty(true);
-                load_ideas(m_chapter_id); // Volver a pintar tablero
-            }
-        }
-        // Si no, asumimos que presionó Guardar. Vemos si el texto cambió.
-        else {
-            std::string new_text = dlg.GetText();
-            if (new_text != text) {
-                // Hay actualización
-                if (m_app_handler->update_concrete_idea_text(id, wxString::FromUTF8(new_text))) {
-                    m_app_handler->set_dirty(true);
-                    load_ideas(m_chapter_id); // Volver a pintar tablero
-                }
+                load_ideas(m_chapter_id);
             }
         }
     }
 }
 
-void ConcreteIdeaView::enable_view(bool enable) {
+void ConcreteIdeaView::OnAddIdea(wxCommandEvent& event)
+{
+    wxTextEntryDialog dlg(this, "Escribe tu idea (Máx 200 caracteres):", "Nueva", "", wxOK | wxCANCEL | wxTE_MULTILINE);
+
+    if (auto* t = dynamic_cast<wxTextCtrl*>(dlg.FindWindow(wxID_ANY)))
+    {
+        t->SetMaxLength(200);
+    }
+
+    if (dlg.ShowModal() == wxID_OK)
+    {
+        wxString secure_text = wxString::Format("%s", dlg.GetValue());
+
+        if (!secure_text.IsEmpty())
+        {
+            if (m_app_handler->add_concrete_idea_for_chapter(m_chapter_id.value(), secure_text))
+            {
+                m_app_handler->set_dirty(true);
+                load_ideas(m_chapter_id);
+            }
+        }
+    }
+}
+
+void ConcreteIdeaView::_update_button_states()
+{
+    m_add_button->Enable(this->IsEnabled() && m_chapter_id.has_value());
+}
+
+void ConcreteIdeaView::enable_view(bool enable)
+{
     this->Enable(enable);
     _update_button_states();
 }
