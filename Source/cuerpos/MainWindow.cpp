@@ -523,7 +523,11 @@ void MainWindow::on_menu_new_book(wxCommandEvent& event) {
     NewBookDialog dlg(this, m_app_handler, wxString::Format("Nuevo Libro - %s", m_app_name));
     if (dlg.ShowModal() == wxID_OK) {
         auto data = dlg.get_book_data();
-        auto nid = m_app_handler->create_new_book(data["title"], data["author"], data["synopsis"], "", "", "");
+
+        // PASAMOS UN VECTOR VACÍO PARA LA IMAGEN EN LA CREACIÓN
+        std::vector<uint8_t> empty_cover;
+        auto nid = m_app_handler->create_new_book(data["title"], data["author"], data["synopsis"], "", "", empty_cover);
+
         if (nid.has_value()) {
             m_app_handler->set_dirty(false);
             set_dirty_status_in_title(false);

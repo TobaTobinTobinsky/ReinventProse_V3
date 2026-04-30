@@ -1,6 +1,10 @@
 ﻿/*
 * File Name: DBManager.h
-* Descripción: Gestión de base de datos SQLite para ReinventProse 3.0.
+* Descripción: Gestión de base de datos SQLite con soporte para BLOBs.
+* Autor: AutoDoc AI (Transcripción literal a C++20)
+* Date: 07/06/2025
+* Version: 1.0.0
+* License: MIT License
 */
 
 #ifndef DBMANAGER_H
@@ -13,6 +17,7 @@
 #include <variant>
 #include <optional>
 #include <stdexcept>
+#include <cstdint>
 
 // --- EXCEPCIONES DESCOMPRIMIDAS ---
 
@@ -124,9 +129,9 @@ public:
     }
 };
 
-// --- TIPOS DE DATOS ---
-
-using DBValue = std::variant<std::monostate, long long, std::string, double>;
+// --- TIPOS DE DATOS CON SOPORTE BLOB ---
+// Añadimos std::vector<uint8_t> para manejar imágenes crudas
+using DBValue = std::variant<std::monostate, long long, std::string, double, std::vector<uint8_t>>;
 using DBRow = std::map<std::string, DBValue>;
 
 class DBManager
@@ -139,14 +144,14 @@ public:
 
     void create_database();
 
-    // Libros
+    // Libros (Ahora recibe vector de bytes)
     int create_book(
         const std::string& title,
         const std::string& author,
         const std::string& synopsis,
         const std::string& prologue,
         const std::string& back_cover_text,
-        const std::string& cover_image_path
+        const std::vector<uint8_t>& cover_image_data
     );
 
     std::optional<DBRow> get_book_by_id(int book_id);
@@ -160,7 +165,7 @@ public:
         const std::string& synopsis,
         const std::string& prologue,
         const std::string& back_cover_text,
-        const std::string& cover_image_path
+        const std::vector<uint8_t>& cover_image_data
     );
 
     bool delete_book(int book_id);
@@ -234,4 +239,4 @@ private:
     bool _initialized_dbm;
 };
 
-#endif
+#endif // DBMANAGER_H

@@ -3,8 +3,7 @@
 * Descripción: Vista que muestra la colección de libros como tarjetas.
 * Autor: AutoDoc AI (Transcripción literal a C++20)
 * Date: 07/06/2025
-* Version: 1.0.0
-* License: MIT License
+* Version: 2.0.0
 */
 
 #ifndef LIBRARYVIEW_H
@@ -17,30 +16,33 @@
 #include <string>
 #include <functional>
 #include <optional>
+#include <cstdint>
 
 class AppHandler;
 
-// Estructura simplificada para usar los datos en las tarjetas
-struct LibroFicha {
+// Estructura simplificada con BLOB en lugar de ruta
+struct LibroFicha
+{
     int id;
     std::string title;
     std::string author;
-    std::string cover_image_path;
+    std::vector<uint8_t> cover_image_data;
 };
 
-// --- Panel Individual de Tarjeta de Libro ---
-class BookCardPanel : public wxPanel {
+class BookCardPanel : public wxPanel
+{
 public:
-    // Constantes de apariencia
     static const int CARD_WIDTH = 150;
     static const int IMAGE_WIDTH = 100;
     static const int IMAGE_HEIGHT = 150;
 
-    /**
-     * Inicializa la tarjeta de un libro.
-     */
-    BookCardPanel(wxWindow* parent, const LibroFicha& book_data, AppHandler* app_handler,
-        std::function<void(int)> on_click, std::function<void(int)> on_delete);
+    BookCardPanel(
+        wxWindow* parent,
+        const LibroFicha& book_data,
+        AppHandler* app_handler,
+        std::function<void(int)> on_click,
+        std::function<void(int)> on_delete
+    );
 
     void set_active_style(bool is_active);
     int get_book_id() const { return m_book.id; }
@@ -64,7 +66,6 @@ private:
     wxStaticText* m_title_label;
     wxStaticText* m_author_label;
 
-    // Nuevos botones
     wxButton* m_btn_edit;
     wxButton* m_btn_delete;
 
@@ -78,8 +79,8 @@ private:
     wxDECLARE_EVENT_TABLE();
 };
 
-// --- Panel Contenedor de la Biblioteca ---
-class LibraryView : public wxScrolled<wxPanel> {
+class LibraryView : public wxScrolled<wxPanel>
+{
 public:
     LibraryView(wxWindow* parent, AppHandler* app_handler);
     virtual ~LibraryView();
@@ -102,10 +103,8 @@ private:
     std::function<void(int)> m_on_card_selected_callback;
     bool m_current_is_sidebar_layout;
 
-    // Estado de ordenamiento (True = ID, False = A-Z)
     bool m_sort_by_id;
 
-    // Sizer principal que contiene el botón de ordenar y las tarjetas
     wxBoxSizer* m_main_vertical_sizer;
     wxButton* m_btn_toggle_sort;
 

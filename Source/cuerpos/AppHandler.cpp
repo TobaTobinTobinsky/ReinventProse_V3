@@ -1,21 +1,17 @@
 /**
 * File Name: AppHandler.cpp
 * Descripción: Implementación del manejador de lógica y puente entre UI y DB.
-* Autor: AutoDoc AI (Transcripción literal a C++20)
-* Date: 07/06/2025
 */
 
 #include "../encabezados/AppHandler.h"
 #include <wx/msgdlg.h>
 
-// Inicialización del puntero estático de la instancia Singleton
 AppHandler* AppHandler::_instance = nullptr;
 
 AppHandler* AppHandler::get_instance(DBManager* db_manager, const wxString& db_name)
 {
     if (!_instance)
     {
-        // Si no se proporciona un DBManager, se intenta obtener o crear uno
         DBManager* db_mngr = db_manager ? db_manager : DBManager::get_instance(db_name.ToStdString());
         _instance = new AppHandler(db_mngr, db_name);
     }
@@ -23,10 +19,7 @@ AppHandler* AppHandler::get_instance(DBManager* db_manager, const wxString& db_n
 }
 
 AppHandler::AppHandler(DBManager* db_manager, const wxString& db_name)
-    : db_manager(db_manager),
-    main_window(nullptr),
-    _is_dirty(false),
-    _initialized(true)
+    : db_manager(db_manager), main_window(nullptr), _is_dirty(false), _initialized(true)
 {
 }
 
@@ -40,8 +33,6 @@ void AppHandler::initialize_database()
     {
         wxMessageBox(wxString::Format("Error al inicializar la base de datos: %s", e.what()),
             "Error de Base de Datos", wxOK | wxICON_ERROR);
-
-        // Error crítico, la app no puede seguir sin DB
         exit(1);
     }
 }
@@ -58,8 +49,13 @@ wxFrame* AppHandler::get_main_window() const
 
 // --- MÉTODOS PARA LIBROS ---
 
-std::optional<int> AppHandler::create_new_book(const wxString& title, const wxString& author, const wxString& synopsis,
-    const wxString& prologue, const wxString& back_cover_text, const wxString& cover_image_path)
+std::optional<int> AppHandler::create_new_book(
+    const wxString& title,
+    const wxString& author,
+    const wxString& synopsis,
+    const wxString& prologue,
+    const wxString& back_cover_text,
+    const std::vector<uint8_t>& cover_image_data)
 {
     try
     {
@@ -69,7 +65,7 @@ std::optional<int> AppHandler::create_new_book(const wxString& title, const wxSt
             synopsis.ToStdString(),
             prologue.ToStdString(),
             back_cover_text.ToStdString(),
-            cover_image_path.ToStdString()
+            cover_image_data
         );
 
         if (book_id > 0)
@@ -88,7 +84,6 @@ std::optional<int> AppHandler::create_new_book(const wxString& title, const wxSt
         wxMessageBox(wxString::Format("Error inesperado: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
     }
-
     return std::nullopt;
 }
 
@@ -102,7 +97,6 @@ std::vector<DBRow> AppHandler::get_all_books()
     {
         wxMessageBox(wxString::Format("Error al obtener libros: %s", e.what()),
             "Error de Base de Datos", wxOK | wxICON_ERROR, main_window);
-
         return {};
     }
 }
@@ -121,13 +115,18 @@ std::optional<DBRow> AppHandler::get_book_details(int book_id)
     {
         wxMessageBox(wxString::Format("Error al obtener detalles: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
-
         return std::nullopt;
     }
 }
 
-bool AppHandler::update_book_details(int book_id, const wxString& title, const wxString& author, const wxString& synopsis,
-    const wxString& prologue, const wxString& back_cover_text, const wxString& cover_image_path)
+bool AppHandler::update_book_details(
+    int book_id,
+    const wxString& title,
+    const wxString& author,
+    const wxString& synopsis,
+    const wxString& prologue,
+    const wxString& back_cover_text,
+    const std::vector<uint8_t>& cover_image_data)
 {
     try
     {
@@ -138,14 +137,13 @@ bool AppHandler::update_book_details(int book_id, const wxString& title, const w
             synopsis.ToStdString(),
             prologue.ToStdString(),
             back_cover_text.ToStdString(),
-            cover_image_path.ToStdString()
+            cover_image_data
         );
     }
     catch (const std::exception& e)
     {
         wxMessageBox(wxString::Format("Error al actualizar libro: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
-
         return false;
     }
 }
@@ -156,7 +154,6 @@ bool AppHandler::delete_book(int book_id)
     {
         if (db_manager->delete_book(book_id))
         {
-            // Marcamos como sucio para que la UI sepa que la lista cambió
             set_dirty(true);
             return true;
         }
@@ -166,7 +163,6 @@ bool AppHandler::delete_book(int book_id)
         wxMessageBox(wxString::Format("Error crítico al eliminar el libro: %s", e.what()),
             "Error de Base de Datos", wxOK | wxICON_ERROR, main_window);
     }
-
     return false;
 }
 
@@ -182,7 +178,6 @@ std::vector<DBRow> AppHandler::get_chapters_by_book_id(int book_id)
     {
         wxMessageBox(wxString::Format("Error al obtener capítulos: %s", e.what()),
             "Error de Base de Datos", wxOK | wxICON_ERROR, main_window);
-
         return {};
     }
 }
@@ -201,13 +196,16 @@ std::optional<DBRow> AppHandler::get_chapter_details(int chapter_id)
     {
         wxMessageBox(wxString::Format("Error al obtener detalles del capítulo: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
-
         return std::nullopt;
     }
 }
 
-std::optional<int> AppHandler::create_new_chapter(int book_id, int chapter_number, const wxString& title,
-    const wxString& content, const wxString& abstract_idea)
+std::optional<int> AppHandler::create_new_chapter(
+    int book_id,
+    int chapter_number,
+    const wxString& title,
+    const wxString& content,
+    const wxString& abstract_idea)
 {
     try
     {
@@ -230,7 +228,6 @@ std::optional<int> AppHandler::create_new_chapter(int book_id, int chapter_numbe
         wxMessageBox(wxString::Format("Error al crear capítulo: %s", e.what()),
             "Error de Creación", wxOK | wxICON_ERROR, main_window);
     }
-
     return std::nullopt;
 }
 
@@ -249,7 +246,6 @@ bool AppHandler::delete_chapter(int chapter_id)
         wxMessageBox(wxString::Format("Error al eliminar capítulo: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
     }
-
     return false;
 }
 
@@ -263,7 +259,6 @@ bool AppHandler::update_chapter_title(int chapter_id, const wxString& new_title)
     {
         wxMessageBox(wxString::Format("Error al actualizar título: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
-
         return false;
     }
 }
@@ -278,7 +273,6 @@ bool AppHandler::update_chapter_content_via_handler(int chapter_id, const wxStri
     {
         wxMessageBox(wxString::Format("Error al actualizar contenido: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
-
         return false;
     }
 }
@@ -293,7 +287,6 @@ bool AppHandler::update_chapter_abstract_idea_via_handler(int chapter_id, const 
     {
         wxMessageBox(wxString::Format("Error al actualizar idea: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
-
         return false;
     }
 }
@@ -310,7 +303,6 @@ std::vector<DBRow> AppHandler::get_concrete_ideas_for_chapter(int chapter_id)
     {
         wxMessageBox(wxString::Format("Error al obtener ideas: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
-
         return {};
     }
 }
@@ -326,7 +318,6 @@ std::optional<int> AppHandler::add_concrete_idea_for_chapter(int chapter_id, con
     {
         wxMessageBox(wxString::Format("Error al agregar idea: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
-
         return std::nullopt;
     }
 }
@@ -341,7 +332,6 @@ bool AppHandler::update_concrete_idea_text(int concrete_idea_id, const wxString&
     {
         wxMessageBox(wxString::Format("Error al actualizar idea: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
-
         return false;
     }
 }
@@ -356,7 +346,6 @@ bool AppHandler::delete_concrete_idea_by_id(int concrete_idea_id)
     {
         wxMessageBox(wxString::Format("Error al eliminar idea: %s", e.what()),
             "Error", wxOK | wxICON_ERROR, main_window);
-
         return false;
     }
 }
@@ -371,7 +360,6 @@ bool AppHandler::swap_concrete_idea_positions(int id1, int id2)
     {
         wxMessageBox(wxString::Format("Error al reordenar ideas: %s", e.what()),
             "Error de Base de Datos", wxOK | wxICON_ERROR, main_window);
-
         return false;
     }
 }
@@ -391,7 +379,8 @@ bool AppHandler::is_application_dirty() const
     return _is_dirty;
 }
 
-void AppHandler::prompt_save_changes(std::function<void()> on_save,
+void AppHandler::prompt_save_changes(
+    std::function<void()> on_save,
     std::function<void()> on_discard,
     std::function<void()> on_cancel)
 {
@@ -401,10 +390,12 @@ void AppHandler::prompt_save_changes(std::function<void()> on_save,
         return;
     }
 
-    wxMessageDialog dlg(main_window,
+    wxMessageDialog dlg(
+        main_window,
         "¿Desea guardar los cambios realizados?",
         "Guardar Cambios",
-        wxYES_NO | wxCANCEL | wxICON_QUESTION);
+        wxYES_NO | wxCANCEL | wxICON_QUESTION
+    );
 
     int result = dlg.ShowModal();
 
