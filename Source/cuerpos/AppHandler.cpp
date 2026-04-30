@@ -60,11 +60,11 @@ std::optional<int> AppHandler::create_new_book(
     try
     {
         int book_id = db_manager->create_book(
-            title.ToStdString(),
-            author.ToStdString(),
-            synopsis.ToStdString(),
-            prologue.ToStdString(),
-            back_cover_text.ToStdString(),
+            title.ToUTF8().data(),
+            author.ToUTF8().data(),
+            synopsis.ToUTF8().data(),
+            prologue.ToUTF8().data(),
+            back_cover_text.ToUTF8().data(),
             cover_image_data
         );
 
@@ -78,11 +78,6 @@ std::optional<int> AppHandler::create_new_book(
     {
         wxMessageBox(wxString::Format("Error al crear el libro: %s", e.what()),
             "Error de Creación de Libro", wxOK | wxICON_ERROR, main_window);
-    }
-    catch (const std::exception& e)
-    {
-        wxMessageBox(wxString::Format("Error inesperado: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
     }
     return std::nullopt;
 }
@@ -132,11 +127,11 @@ bool AppHandler::update_book_details(
     {
         return db_manager->update_book(
             book_id,
-            title.ToStdString(),
-            author.ToStdString(),
-            synopsis.ToStdString(),
-            prologue.ToStdString(),
-            back_cover_text.ToStdString(),
+            title.ToUTF8().data(),
+            author.ToUTF8().data(),
+            synopsis.ToUTF8().data(),
+            prologue.ToUTF8().data(),
+            back_cover_text.ToUTF8().data(),
             cover_image_data
         );
     }

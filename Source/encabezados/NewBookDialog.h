@@ -1,10 +1,6 @@
 /*
 * Archivo: NewBookDialog.h
 * Descripción: Define un diálogo para crear un nuevo libro con campos esenciales.
-* Autor: AutoDoc AI (Transcripción literal a C++20)
-* Date: 07/06/2025
-* Version: 1.0.0
-* License: MIT License
 */
 
 #ifndef NEWBOOKDIALOG_H
@@ -16,7 +12,8 @@
 
 class AppHandler;
 
-class NewBookDialog : public wxDialog {
+class NewBookDialog : public wxDialog
+{
 public:
     /**
      * Inicializa una nueva instancia del diálogo NewBookDialog.
@@ -24,13 +21,17 @@ public:
      * @param app_handler: Manejador de la lógica de aplicación.
      * @param dialog_title: El título de la ventana.
      */
-    NewBookDialog(wxWindow* parent, AppHandler* app_handler, const wxString& dialog_title = "Nuevo Libro");
+    NewBookDialog(
+        wxWindow* parent,
+        AppHandler* app_handler,
+        const wxString& dialog_title = "Nuevo Libro"
+    );
 
     /**
      * Recopila y devuelve los datos ingresados por el usuario.
-     * @return std::map con claves: title, author, synopsis, etc.
+     * @return std::map con claves de string y valores de wxString para mantener la codificación.
      */
-    std::map<std::string, std::string> get_book_data();
+    std::map<std::string, wxString> get_book_data();
 
 private:
     // Construcción de la interfaz

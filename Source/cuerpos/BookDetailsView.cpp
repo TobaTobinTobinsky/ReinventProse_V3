@@ -1,6 +1,6 @@
 /**
 * File Name: BookDetailsView.cpp
-* Description: Implementación del panel de libro, con gestión de imagen como BLOB (bytes crudos).
+* Descripción: Implementación del panel de libro, con blindaje UTF-8 en el guardado.
 */
 
 #include "../encabezados/BookDetailsView.h"
@@ -13,7 +13,7 @@
 #include <wx/mstream.h>
 
 BookDetailsView::BookDetailsView(wxWindow* parent, AppHandler* app_handler)
-    : wxPanel(parent),
+    : wxPanel(parent, wxID_ANY),
     app_handler(app_handler),
     book_id(std::nullopt),
     _is_dirty_view(false),
@@ -31,8 +31,8 @@ void BookDetailsView::_create_controls()
     author_label = new wxStaticText(this, wxID_ANY, "Autor (*):");
     synopsis_label = new wxStaticText(this, wxID_ANY, "Sinopsis:");
     prologue_label = new wxStaticText(this, wxID_ANY, "Prólogo:");
-    back_cover_text_label = new wxStaticText(this, wxID_ANY, "Imagen de Portada:"); // Etiqueta ajustada
-    cover_image_label_text = new wxStaticText(this, wxID_ANY, "");
+    back_cover_text_label = new wxStaticText(this, wxID_ANY, "Texto de Contraportada:");
+    cover_image_label_text = new wxStaticText(this, wxID_ANY, "Imagen de Portada:");
 
     title_ctrl = new wxTextCtrl(this, wxID_ANY);
     author_ctrl = new wxTextCtrl(this, wxID_ANY);
@@ -70,11 +70,10 @@ void BookDetailsView::_layout_controls()
     form_sizer->Add(prologue_label, 0, wxALIGN_RIGHT | wxALIGN_TOP | wxTOP, 5);
     form_sizer->Add(prologue_ctrl, 1, wxEXPAND);
 
-    // Ajuste en el orden visual
-    form_sizer->Add(new wxStaticText(this, wxID_ANY, "Texto Tapa Trasera:"), 0, wxALIGN_RIGHT | wxALIGN_TOP | wxTOP, 5);
+    form_sizer->Add(back_cover_text_label, 0, wxALIGN_RIGHT | wxALIGN_TOP | wxTOP, 5);
     form_sizer->Add(back_cover_text_ctrl, 1, wxEXPAND);
 
-    form_sizer->Add(back_cover_text_label, 0, wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL);
+    form_sizer->Add(cover_image_label_text, 0, wxALIGN_RIGHT | wxALIGN_CENTER_VERTICAL);
     form_sizer->Add(cover_image_display, 0, wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL);
 
     main_sizer->Add(form_sizer, 1, wxEXPAND | wxALL, 10);
@@ -129,12 +128,13 @@ void BookDetailsView::load_book_details(std::optional<int> id)
         {
             DBRow& data = details_opt.value();
 
-            auto get_safe_string = [&](const std::string& key) -> wxString {
-                if (data.count(key) && std::holds_alternative<std::string>(data.at(key)))
+            auto get_safe_string = [&](const std::string& key) -> wxString
                 {
-                    return wxString::FromUTF8(std::get<std::string>(data.at(key)));
-                }
-                return wxEmptyString;
+                    if (data.count(key) && std::holds_alternative<std::string>(data.at(key)))
+                    {
+                        return wxString::FromUTF8(std::get<std::string>(data.at(key)));
+                    }
+                    return wxEmptyString;
                 };
 
             title_ctrl->SetValue(get_safe_string("title"));
@@ -143,7 +143,6 @@ void BookDetailsView::load_book_details(std::optional<int> id)
             prologue_ctrl->SetValue(get_safe_string("prologue"));
             back_cover_text_ctrl->SetValue(get_safe_string("back_cover_text"));
 
-            // LECTURA DEL BLOB DESDE LA BASE DE DATOS
             if (data.count("cover_image_data") && std::holds_alternative<std::vector<uint8_t>>(data.at("cover_image_data")))
             {
                 m_current_cover_image_data = std::get<std::vector<uint8_t>>(data.at("cover_image_data"));
@@ -198,7 +197,6 @@ bool BookDetailsView::save_changes()
     wxString prologue = prologue_ctrl->GetValue();
     wxString back_cover = back_cover_text_ctrl->GetValue();
 
-    // Enviamos el BLOB (o un vector vacío si no hay imagen)
     std::vector<uint8_t> cover_data;
     if (m_current_cover_image_data.has_value())
     {
@@ -246,7 +244,6 @@ void BookDetailsView::on_image_clicked(wxMouseEvent& event)
     {
         wxString new_path = dialog.GetPath();
 
-        // LECTURA DEL ARCHIVO AL BINARIO C++ (BLOB)
         wxFile file(new_path, wxFile::read);
         if (file.IsOpened())
         {
@@ -254,16 +251,13 @@ void BookDetailsView::on_image_clicked(wxMouseEvent& event)
             std::vector<uint8_t> buffer(length);
             file.Read(buffer.data(), length);
 
-            // Validamos que sea una imagen real antes de guardar la basura en RAM
             wxMemoryInputStream stream(buffer.data(), buffer.size());
             wxImage img;
 
             if (img.LoadFile(stream, wxBITMAP_TYPE_ANY))
             {
-                // Exito: Guardamos en memoria RAM para el próximo Save
                 m_current_cover_image_data = buffer;
 
-                // Renderizado
                 cover_image_display->SetBitmap(wxBitmap(img.Rescale(100, 150, wxIMAGE_QUALITY_HIGH)));
                 set_view_dirty(true);
             }
