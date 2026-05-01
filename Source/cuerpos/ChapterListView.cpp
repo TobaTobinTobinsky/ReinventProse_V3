@@ -1,6 +1,6 @@
 /**
 * File Name: ChapterListView.cpp
-* Descripción: Implementación de la lista de capítulos con manejo robusto de base de datos.
+* Descripción: Implementación de la lista de capítulos con manejo robusto y seguro UTF-8.
 */
 
 #include "../encabezados/ChapterListView.h"
@@ -151,7 +151,9 @@ void ChapterListView::on_add_chapter(wxCommandEvent& event) {
     wxTextEntryDialog dlg(this, "Título del nuevo capítulo:", "Añadir Capítulo");
 
     if (dlg.ShowModal() == wxID_OK) {
-        wxString title = dlg.GetValue().Trim(true).Trim(false);
+        // BLINDAJE FORMAT PARA LAS TILDES
+        wxString title = wxString::Format("%s", dlg.GetValue().Trim(true).Trim(false));
+
         if (title.IsEmpty()) {
             wxMessageBox("El título del capítulo no puede estar vacío.", "Error de Validación", wxOK | wxICON_ERROR, this);
             return;
@@ -202,7 +204,8 @@ void ChapterListView::on_edit_chapter(wxCommandEvent& event) {
     wxTextEntryDialog dlg(this, "Introduzca el nuevo título para el capítulo:", "Modificar Título", current_title);
 
     if (dlg.ShowModal() == wxID_OK) {
-        wxString new_t = dlg.GetValue().Trim(true).Trim(false);
+        // BLINDAJE FORMAT PARA LAS TILDES
+        wxString new_t = wxString::Format("%s", dlg.GetValue().Trim(true).Trim(false));
 
         if (new_t.IsEmpty()) {
             wxMessageBox("El título del capítulo no puede estar vacío.", "Error", wxOK | wxICON_ERROR, this);
