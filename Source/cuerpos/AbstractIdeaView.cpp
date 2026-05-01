@@ -3,7 +3,7 @@
 * @brief Implementación de la vista para la gestión de la idea abstracta de un capítulo.
 * @author AutoDoc AI (Transcripción a C++20)
 * @date 07/06/2025
-* @version 1.0.0
+* @version 1.1.0
 * @license MIT License
 */
 
@@ -30,13 +30,19 @@ AbstractIdeaView::AbstractIdeaView(wxWindow* parent, AppHandler* app_handler)
 /**
 * @brief Crea los componentes visuales (widgets) del panel.
 */
-void AbstractIdeaView::_create_controls() {
+void AbstractIdeaView::_create_controls()
+{
     label_ctrl = new wxStaticText(this, wxID_ANY, "Idea Abstracta del Capítulo:");
 
     // Instancia un control de texto multilínea que procesa la tecla Enter
-    abstract_idea_ctrl = new wxTextCtrl(this, wxID_ANY, wxEmptyString,
-        wxDefaultPosition, wxDefaultSize,
-        wxTE_MULTILINE | wxTE_PROCESS_ENTER);
+    abstract_idea_ctrl = new wxTextCtrl(
+        this,
+        wxID_ANY,
+        wxEmptyString,
+        wxDefaultPosition,
+        wxDefaultSize,
+        wxTE_MULTILINE | wxTE_PROCESS_ENTER
+    );
 
     // Vinculación dinámica del evento para evitar problemas con tablas de eventos estáticas
     abstract_idea_ctrl->Bind(wxEVT_TEXT, &AbstractIdeaView::on_text_changed, this);
@@ -45,7 +51,8 @@ void AbstractIdeaView::_create_controls() {
 /**
 * @brief Organiza los controles en el panel utilizando sizers para un diseño responsivo.
 */
-void AbstractIdeaView::_layout_controls() {
+void AbstractIdeaView::_layout_controls()
+{
     // Uso de un sizer vertical para apilar los elementos
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -61,12 +68,15 @@ void AbstractIdeaView::_layout_controls() {
 /**
 * @brief Actualiza el estado de modificación ("sucio") de la vista.
 */
-void AbstractIdeaView::set_view_dirty(bool is_dirty) {
-    if (this->_is_dirty_view != is_dirty) {
+void AbstractIdeaView::set_view_dirty(bool is_dirty)
+{
+    if (this->_is_dirty_view != is_dirty)
+    {
         this->_is_dirty_view = is_dirty;
 
         // Si la vista local está sucia, notificamos al manejador global de la aplicación
-        if (this->_is_dirty_view) {
+        if (this->_is_dirty_view)
+        {
             app_handler->set_dirty(true);
         }
     }
@@ -75,7 +85,8 @@ void AbstractIdeaView::set_view_dirty(bool is_dirty) {
 /**
 * @brief Carga la información de la idea abstracta desde la base de datos.
 */
-void AbstractIdeaView::load_idea(std::optional<int> id) {
+void AbstractIdeaView::load_idea(std::optional<int> id)
+{
     // Activamos bandera para evitar que el evento de cambio de texto se dispare durante la carga programática
     _loading_data = true;
     chapter_id = id;
@@ -87,24 +98,29 @@ void AbstractIdeaView::load_idea(std::optional<int> id) {
     bool is_chapter_present = chapter_id.has_value();
     abstract_idea_ctrl->Enable(is_chapter_present);
 
-    if (is_chapter_present) {
+    if (is_chapter_present)
+    {
         // Recupera los datos del capítulo a través del AppHandler
         std::optional<DBRow> chapter_details = app_handler->get_chapter_details(chapter_id.value());
 
-        if (chapter_details.has_value()) {
+        if (chapter_details.has_value())
+        {
             DBRow details = chapter_details.value();
 
             // Buscamos la clave específica en el mapa de detalles de manera segura
-            if (details.count("abstract_idea")) {
+            if (details.count("abstract_idea"))
+            {
                 DBValue val = details.at("abstract_idea");
-                if (std::holds_alternative<std::string>(val)) {
+                if (std::holds_alternative<std::string>(val))
+                {
                     // Convertimos el std::string en UTF-8 a wxString para visualizar la "Ñ" correctamente
                     wxString idea_text = wxString::FromUTF8(std::get<std::string>(val));
                     abstract_idea_ctrl->SetValue(idea_text);
                 }
             }
         }
-        else {
+        else
+        {
             std::cerr << "Advertencia (AbstractIdeaView): No se encontraron detalles para capítulo ID "
                 << chapter_id.value() << std::endl;
         }
@@ -121,19 +137,27 @@ void AbstractIdeaView::load_idea(std::optional<int> id) {
 /**
 * @brief Persiste los cambios realizados en el control de texto hacia la Base de Datos.
 */
-bool AbstractIdeaView::save_changes() {
+bool AbstractIdeaView::save_changes()
+{
     // Si no hay cambios o no hay un capítulo seleccionado, no hacemos nada
-    if (!_is_dirty_view || !chapter_id.has_value()) {
+    if (!_is_dirty_view || !chapter_id.has_value())
+    {
         return false;
     }
 
-    // Extraemos el texto del control y lo convertimos a UTF-8 para la base de datos
-    std::string text_to_save = abstract_idea_ctrl->GetValue().ToUTF8().data();
+    // --- EL BLINDAJE DEL JEFE ---
+    // Usamos wxString::Format para empaquetar el texto y evitar que Windows rompa la codificación local.
+    // AppHandler se encargará de hacer el .ToUTF8().data() antes de tocar SQLite.
+    wxString text_to_save = wxString::Format("%s", abstract_idea_ctrl->GetValue());
 
     // Intenta actualizar la información mediante el manejador de la aplicación
-    bool success = app_handler->update_chapter_abstract_idea_via_handler(chapter_id.value(), text_to_save);
+    bool success = app_handler->update_chapter_abstract_idea_via_handler(
+        chapter_id.value(),
+        text_to_save
+    );
 
-    if (success) {
+    if (success)
+    {
         // Si tuvo éxito, la vista ya no está sucia
         set_view_dirty(false);
         return true;
@@ -145,9 +169,11 @@ bool AbstractIdeaView::save_changes() {
 /**
 * @brief Manejador disparado cuando el usuario modifica el texto en el control.
 */
-void AbstractIdeaView::on_text_changed(wxCommandEvent& event) {
+void AbstractIdeaView::on_text_changed(wxCommandEvent& event)
+{
     // Ignoramos el evento si estamos cargando datos programáticamente o si el control está deshabilitado
-    if (_loading_data || !abstract_idea_ctrl->IsEnabled()) {
+    if (_loading_data || !abstract_idea_ctrl->IsEnabled())
+    {
         event.Skip();
         return;
     }
@@ -160,14 +186,16 @@ void AbstractIdeaView::on_text_changed(wxCommandEvent& event) {
 /**
 * @brief Consulta si la vista actual tiene cambios pendientes de guardado.
 */
-bool AbstractIdeaView::is_dirty() const {
+bool AbstractIdeaView::is_dirty() const
+{
     return _is_dirty_view;
 }
 
 /**
 * @brief Habilita o deshabilita la interacción del usuario con la vista.
 */
-void AbstractIdeaView::enable_view(bool enable) {
+void AbstractIdeaView::enable_view(bool enable)
+{
     this->Enable(enable);
     abstract_idea_ctrl->Enable(enable && chapter_id.has_value());
 }
