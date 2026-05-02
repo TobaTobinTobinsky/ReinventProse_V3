@@ -1,6 +1,6 @@
 /**
 * Archivo: ChapterContentView.cpp
-* Descripción: Implementación del editor con interruptor animado y lógica de protección UTF-8.
+* Descripción: Implementación del editor con interruptor animado, contador de palabras y lógica de protección UTF-8.
 */
 
 #include "../encabezados/ChapterContentView.h"
@@ -9,6 +9,7 @@
 #include <wx/graphics.h>
 #include <wx/dcbuffer.h>
 #include <wx/settings.h>
+#include <wx/tokenzr.h> // Necesario para contar palabras
 
 // ============================================================================
 // IMPLEMENTACIÓN: ModernToggleSwitch (Interruptor de Hardware Virtual)
@@ -124,6 +125,11 @@ void ChapterContentView::_create_controls()
 {
     content_label = new wxStaticText(this, wxID_ANY, "Contenido del Capítulo:");
 
+    // Etiqueta del contador de palabras con diseño estilizado
+    m_word_count_label = new wxStaticText(this, wxID_ANY, "Palabras: 0");
+    m_word_count_label->SetFont(wxFont(9, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_ITALIC, wxFONTWEIGHT_BOLD));
+    m_word_count_label->SetForegroundColour(wxColour(100, 100, 100));
+
     content_ctrl = new wxTextCtrl(this, wxID_ANY, wxEmptyString,
         wxDefaultPosition, wxDefaultSize,
         wxTE_MULTILINE | wxTE_RICH2);
@@ -147,11 +153,36 @@ void ChapterContentView::_layout_controls()
     toggle_container->Add(m_toggle, 0, wxALIGN_CENTER_HORIZONTAL | wxTOP, 10);
     toggle_container->Add(m_toggle_label, 0, wxALIGN_CENTER_HORIZONTAL | wxTOP | wxBOTTOM, 5);
 
+    // Área de etiquetas (Título a la izquierda, Contador a la derecha)
+    wxBoxSizer* labels_sizer = new wxBoxSizer(wxHORIZONTAL);
+    labels_sizer->Add(content_label, 0, wxALIGN_CENTER_VERTICAL);
+    labels_sizer->AddStretchSpacer(1); // Empuja el contador hacia la derecha
+    labels_sizer->Add(m_word_count_label, 0, wxALIGN_CENTER_VERTICAL);
+
     main_sizer->Add(toggle_container, 0, wxEXPAND | wxBOTTOM, 10);
-    main_sizer->Add(content_label, 0, wxALL | wxEXPAND, 5);
+    main_sizer->Add(labels_sizer, 0, wxALL | wxEXPAND, 5);
     main_sizer->Add(content_ctrl, 1, wxEXPAND | wxALL, 5);
 
     this->SetSizer(main_sizer);
+}
+
+void ChapterContentView::_update_word_count()
+{
+    if (content_ctrl == nullptr || m_word_count_label == nullptr)
+    {
+        return;
+    }
+
+    wxString current_text = content_ctrl->GetValue();
+
+    // Usamos el tokenizador para separar por espacios, saltos de línea y tabulaciones
+    wxStringTokenizer tokenizer(current_text, " \t\r\n");
+    int count = tokenizer.CountTokens();
+
+    m_word_count_label->SetLabel(wxString::Format("Palabras: %d", count));
+
+    // Forzamos actualización visual rápida del layout por si los números crecen
+    this->Layout();
 }
 
 void ChapterContentView::load_content(std::optional<int> id)
@@ -178,6 +209,9 @@ void ChapterContentView::load_content(std::optional<int> id)
     {
         content_label->SetLabel("Contenido: (Seleccione un capítulo)");
     }
+
+    // Actualizamos el contador recién cargamos el contenido
+    _update_word_count();
 
     content_ctrl->SetInsertionPoint(0);
     _is_dirty_view = false;
@@ -247,10 +281,14 @@ void ChapterContentView::_update_edit_mode_ui()
 
 void ChapterContentView::on_text_changed(wxCommandEvent& event)
 {
+    // El contador se actualiza siempre, sin importar el modo
+    _update_word_count();
+
     if (!_loading_data && _is_in_edit_mode)
     {
         set_view_dirty(true);
     }
+
     event.Skip();
 }
 

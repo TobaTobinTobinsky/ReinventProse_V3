@@ -26,6 +26,7 @@ class BookDetailsView;
 class ChapterContentView;
 class AbstractIdeaView;
 class ConcreteIdeaView;
+class WordStatsView;
 class LibraryView;
 class ChapterListView;
 
@@ -114,6 +115,7 @@ private:
     ChapterContentView* m_chapter_content_view;
     AbstractIdeaView* m_abstract_idea_view;
     ConcreteIdeaView* m_concrete_idea_view;
+    WordStatsView* m_word_stats_view;
 
     // Constantes
     const wxString CONFIG_DIR = ".reinventprose_v3_config";

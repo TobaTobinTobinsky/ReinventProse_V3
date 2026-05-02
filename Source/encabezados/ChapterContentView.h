@@ -1,6 +1,6 @@
 /*
 * Archivo: ChapterContentView.h
-* Descripción: Panel de edición de capítulos con interruptor animado procedural.
+* Descripción: Panel de edición de capítulos con interruptor animado procedural y contador de palabras.
 */
 
 #ifndef CHAPTERCONTENTVIEW_H
@@ -58,6 +58,9 @@ private:
     void _layout_controls();
     void _update_edit_mode_ui();
 
+    // Nuevo método para contar y actualizar las palabras
+    void _update_word_count();
+
     void on_text_changed(wxCommandEvent& event);
     void on_toggle_switch(wxCommandEvent& event);
 
@@ -69,6 +72,7 @@ private:
 
     // Controles
     wxStaticText* content_label;
+    wxStaticText* m_word_count_label; // Nueva etiqueta para el contador
     wxTextCtrl* content_ctrl;
 
     // El nuevo interruptor

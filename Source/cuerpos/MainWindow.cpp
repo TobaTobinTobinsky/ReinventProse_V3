@@ -9,6 +9,7 @@
 #include "../encabezados/ChapterContentView.h"
 #include "../encabezados/AbstractIdeaView.h"
 #include "../encabezados/ConcreteIdeaView.h"
+#include "../encabezados/WordStatsView.h"
 #include "../encabezados/LibraryView.h"
 #include "../encabezados/ChapterListView.h"
 #include "../encabezados/NewBookDialog.h"
@@ -152,10 +153,12 @@ void MainWindow::_ensure_edit_notebook() {
         m_chapter_content_view = new ChapterContentView(m_edit_notebook, m_app_handler);
         m_abstract_idea_view = new AbstractIdeaView(m_edit_notebook, m_app_handler);
         m_concrete_idea_view = new ConcreteIdeaView(m_edit_notebook, m_app_handler);
+        m_word_stats_view = new WordStatsView(m_edit_notebook, m_app_handler);
 
         m_edit_notebook->AddPage(m_chapter_content_view, "Escritura");
         m_edit_notebook->AddPage(m_abstract_idea_view, "Idea Abstracta");
         m_edit_notebook->AddPage(m_concrete_idea_view, "Ideas Concretas");
+        m_edit_notebook->AddPage(m_word_stats_view, "Estadísticas");
 
         m_aui_manager.AddPane(m_edit_notebook, wxAuiPaneInfo().Name("editor").Caption("Editor de Capítulo").CenterPane().Hide());
     }
@@ -272,6 +275,7 @@ void MainWindow::_update_notebook_pages_state(bool chapter_is_selected) {
     if (m_chapter_content_view) m_chapter_content_view->enable_view(chapter_is_selected);
     if (m_abstract_idea_view) m_abstract_idea_view->enable_view(chapter_is_selected);
     if (m_concrete_idea_view) m_concrete_idea_view->enable_view(chapter_is_selected);
+    if (m_word_stats_view) m_word_stats_view->enable_view(chapter_is_selected);
 }
 
 void MainWindow::_load_chapter_data_into_edit_views(std::optional<int> chapter_id) {
@@ -279,6 +283,7 @@ void MainWindow::_load_chapter_data_into_edit_views(std::optional<int> chapter_i
     if (m_chapter_content_view) m_chapter_content_view->load_content(chapter_id);
     if (m_abstract_idea_view) m_abstract_idea_view->load_idea(chapter_id);
     if (m_concrete_idea_view) m_concrete_idea_view->load_ideas(chapter_id);
+    if (m_word_stats_view) m_word_stats_view->load_stats(chapter_id);
 }
 
 void MainWindow::_reevaluate_global_dirty_state() {
