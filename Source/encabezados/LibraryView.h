@@ -1,9 +1,9 @@
 /*
 * File Name: LibraryView.h
-* Descripción: Vista que muestra la colección de libros como tarjetas.
+* Descripción: Vista que muestra la colección de libros como tarjetas de lujo (Renderizado Procedural).
 * Autor: AutoDoc AI (Transcripción literal a C++20)
 * Date: 07/06/2025
-* Version: 2.0.0
+* Version: 3.1.0
 */
 
 #ifndef LIBRARYVIEW_H
@@ -20,7 +20,7 @@
 
 class AppHandler;
 
-// Estructura simplificada con BLOB en lugar de ruta
+// Estructura simplificada con BLOB
 struct LibroFicha
 {
     int id;
@@ -29,10 +29,12 @@ struct LibroFicha
     std::vector<uint8_t> cover_image_data;
 };
 
+// --- Panel Individual de Tarjeta de Libro (Ficha de Lujo) ---
 class BookCardPanel : public wxPanel
 {
 public:
-    static const int CARD_WIDTH = 150;
+    static const int CARD_WIDTH = 160;
+    static const int CARD_HEIGHT = 270;
     static const int IMAGE_WIDTH = 100;
     static const int IMAGE_HEIGHT = 150;
 
@@ -40,45 +42,40 @@ public:
         wxWindow* parent,
         const LibroFicha& book_data,
         AppHandler* app_handler,
-        std::function<void(int)> on_click,
-        std::function<void(int)> on_delete
+        std::function<void(int)> on_details_click,
+        std::function<void(int)> on_read_click,
+        std::function<void(int)> on_delete_click
     );
 
     void set_active_style(bool is_active);
     int get_book_id() const { return m_book.id; }
 
 private:
-    void _create_controls();
-    void _layout_controls();
-
+    // Eventos de dibujado y clics nativos
     void on_internal_card_click(wxMouseEvent& event);
-    void on_edit_btn_click(wxCommandEvent& event);
-    void on_delete_btn_click(wxCommandEvent& event);
     void on_paint(wxPaintEvent& event);
 
     LibroFicha m_book;
     AppHandler* m_app_handler;
-    std::function<void(int)> m_on_click;
-    std::function<void(int)> m_on_delete;
+
+    // Callbacks con inteligencia de contexto
+    std::function<void(int)> m_on_details_click;
+    std::function<void(int)> m_on_read_click;
+    std::function<void(int)> m_on_delete_click;
+
     bool m_is_active_style;
 
-    wxStaticBitmap* m_cover_image_ctrl;
-    wxStaticText* m_title_label;
-    wxStaticText* m_author_label;
+    // Almacenamos el bitmap en memoria para no decodificar el BLOB en cada frame
+    wxBitmap m_cover_bitmap;
 
-    wxButton* m_btn_edit;
-    wxButton* m_btn_delete;
-
+    // Colores de estado
     wxColour ACTIVE_BG_COLOUR;
     wxColour INACTIVE_BG_COLOUR;
-    wxColour ACTIVE_BORDER_COLOUR;
-    wxColour INACTIVE_BORDER_COLOUR;
-    const int ACTIVE_BORDER_WIDTH = 2;
-    const int INACTIVE_BORDER_WIDTH = 1;
 
     wxDECLARE_EVENT_TABLE();
 };
 
+// --- Panel Contenedor de la Biblioteca ---
 class LibraryView : public wxScrolled<wxPanel>
 {
 public:
@@ -86,6 +83,8 @@ public:
     virtual ~LibraryView();
 
     void set_on_book_card_selected_callback(std::function<void(int)> callback);
+    void set_on_book_read_callback(std::function<void(int)> callback);
+
     void set_layout_mode(bool is_sidebar);
     void load_books();
     void clear_view();
@@ -100,9 +99,11 @@ private:
 
     AppHandler* m_app_handler;
     std::vector<BookCardPanel*> m_book_card_panels;
-    std::function<void(int)> m_on_card_selected_callback;
-    bool m_current_is_sidebar_layout;
 
+    std::function<void(int)> m_on_card_selected_callback; // Para Detalles
+    std::function<void(int)> m_on_book_read_callback;     // Para Leer/Editar
+
+    bool m_current_is_sidebar_layout;
     bool m_sort_by_id;
 
     wxBoxSizer* m_main_vertical_sizer;

@@ -113,6 +113,15 @@ wxBitmap MainWindow::_load_tool_icon(const wxString& icon_name, const wxSize& ic
     return Util::LoadIconBitmap(icon_name, icon_size);
 }
 
+wxBitmap MainWindow::_get_res_bmp(const unsigned char* data, unsigned int size) {
+    wxMemoryInputStream stream(data, size);
+    wxImage img;
+    if (img.LoadFile(stream, wxBITMAP_TYPE_ANY)) {
+        return wxBitmap(img.Rescale(24, 24, wxIMAGE_QUALITY_HIGH));
+    }
+    return wxNullBitmap;
+}
+
 void MainWindow::_create_status_bar() {
     CreateStatusBar(2);
     SetStatusText("Listo", 0);
@@ -122,6 +131,7 @@ void MainWindow::_create_status_bar() {
 void MainWindow::_create_views() {
     m_library_view = new LibraryView(m_base_panel, m_app_handler);
     m_library_view->set_on_book_card_selected_callback([this](int id) { on_library_book_selected(id); });
+    m_library_view->set_on_book_read_callback([this](int id) { on_library_book_read(id); });
 
     m_book_details_view = new BookDetailsView(m_base_panel, m_app_handler);
 
@@ -193,15 +203,6 @@ void MainWindow::_create_toolbar() {
 // ============================================================================
 // LÓGICA DE INTERFAZ Y ESTADOS
 // ============================================================================
-
-wxBitmap MainWindow::_get_res_bmp(const unsigned char* data, unsigned int size) {
-    wxMemoryInputStream stream(data, size);
-    wxImage img;
-    if (img.LoadFile(stream, wxBITMAP_TYPE_ANY)) {
-        return wxBitmap(img.Rescale(24, 24, wxIMAGE_QUALITY_HIGH));
-    }
-    return wxNullBitmap;
-}
 
 void MainWindow::_update_toolbar_state(int state) {
     wxToolBar* tb = GetToolBar();
@@ -413,6 +414,47 @@ void MainWindow::on_library_book_selected(int selected_book_id) {
     m_aui_manager.Update();
 }
 
+void MainWindow::on_library_book_read(int selected_book_id) {
+    if (selected_book_id == m_current_book_id && m_current_app_state == STATE_EDIT) {
+        return;
+    }
+
+    if (m_app_handler->is_application_dirty() && !_confirm_discard_changes()) {
+        return;
+    }
+
+    m_current_book_id = selected_book_id;
+    m_current_app_state = STATE_EDIT;
+
+    auto book_details = m_app_handler->get_book_details(selected_book_id);
+    wxString title = book_details && book_details->count("title") ? wxString::FromUTF8(std::get<std::string>(book_details->at("title"))) : wxString("Desconocido");
+
+    GetStatusBar()->SetStatusText(wxString::Format("Libro: %s", title), 0);
+    GetStatusBar()->SetStatusText(wxString::Format("Libro ID: %d", selected_book_id), 1);
+
+    if (m_book_details_view) m_book_details_view->load_book_details(selected_book_id);
+
+    _ensure_edit_notebook();
+
+    m_aui_manager.GetPane("library").Hide();
+    m_aui_manager.GetPane("details").Hide();
+
+    m_aui_manager.GetPane("chapters").Left().Layer(0).Position(0).BestSize(300, -1).Show();
+    m_aui_manager.GetPane("editor").CentrePane().Show();
+
+    _update_notebook_pages_state(false);
+
+    if (m_chapter_list_view) m_chapter_list_view->load_chapters(m_current_book_id);
+    if (m_edit_notebook && m_edit_notebook->GetPageCount() > 0) m_edit_notebook->SetSelection(0);
+
+    _update_toolbar_state(STATE_EDIT);
+
+    m_app_handler->set_dirty(false);
+    set_dirty_status_in_title(false);
+
+    m_aui_manager.Update();
+}
+
 void MainWindow::on_edit_book_tool_click(wxCommandEvent& event) {
     if (!m_current_book_id.has_value()) {
         return;
@@ -524,7 +566,6 @@ void MainWindow::on_menu_new_book(wxCommandEvent& event) {
     if (dlg.ShowModal() == wxID_OK) {
         auto data = dlg.get_book_data();
 
-        // PASAMOS UN VECTOR VACÍO PARA LA IMAGEN EN LA CREACIÓN
         std::vector<uint8_t> empty_cover;
         auto nid = m_app_handler->create_new_book(data["title"], data["author"], data["synopsis"], "", "", empty_cover);
 
@@ -600,12 +641,10 @@ void MainWindow::on_export_pdf(wxCommandEvent& event) {
 void MainWindow::on_menu_about(wxCommandEvent& event) {
     ReinventProseAboutInfo info;
 
-    // Formateando a la fuerza bruta hasta los campos cortos
     info.SetName(wxString::Format("ReinventProse 3.0").ToUTF8().data());
     info.SetVersion(wxString::Format("3.0.42 (Pure C++ Edition)").ToUTF8().data());
     info.SetCopyright(wxString::Format("(C) 2023-2024 Mauricio José Tobares. Todos los derechos reservados.").ToUTF8().data());
 
-    // 1 - GENERAL
     wxString desc = wxString::Format(
         "Una aplicación de escritorio de alto rendimiento para la gestión integral "
         "y organización de proyectos de escritura creativa.\n\n"
@@ -617,7 +656,6 @@ void MainWindow::on_menu_about(wxCommandEvent& event) {
     );
     info.SetDescription(desc.ToUTF8().data());
 
-    // 2 - LICENCIA
     wxString lic_text = wxString::Format(
         "MIT License\n\n"
         "Copyright (c) 2023-2024 Mauricio José Tobares\n\n"
@@ -643,21 +681,16 @@ void MainWindow::on_menu_about(wxCommandEvent& event) {
         return std::string(wxString::Format("%s", texto).ToUTF8().data());
         };
 
-    // 3 - EQUIPO DE DESARROLLO
     info.AddDeveloper(set_safe("Mauricio José Tobares (El Jefe) - Ideólogo y Director del Proyecto"));
     info.AddDeveloper(set_safe("PJ (Programador Jefe Asistente IA) - Desarrollo Principal y Arquitectura"));
     info.AddDeveloper(set_safe("IP (Ingeniero de Pruebas IA) - Aseguramiento de Calidad"));
 
-    // 4 - DOCUMENTADORES
     info.AddDocWriter(set_safe("GP (Planificador de Proyectos IA) - Documentación Técnica y Planificación"));
 
-    // 5 - ARTISTAS
     info.AddArtist(set_safe("DUXUI (Diseñador UX/UI IA) - Diseño de Interfaz y Experiencia de Usuario"));
 
-    // 6 - TRADUCCIÓN
     info.AddTranslator(set_safe("Mauricio José Tobares - Único responsable (aunque todavía no traduje nada XD)"));
 
-    // 7 - COLABORADORES
     info.AddCollaborator(set_safe("Amigo Tester #1"), set_safe("Valiosas pruebas y sugerencias de usabilidad."));
     info.AddCollaborator(set_safe("Comunidad de Betas Anónimos"), set_safe("Por el feedback constructivo."));
 

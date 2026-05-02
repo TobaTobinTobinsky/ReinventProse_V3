@@ -1,6 +1,6 @@
 /**
 * File Name: LibraryView.cpp
-* Descripción: Implementación de la vista de biblioteca con lectura de BLOBs para portadas.
+* Descripción: Implementación de la vista de biblioteca con tarjetas dinámicas contextuales.
 */
 
 #include "../encabezados/LibraryView.h"
@@ -12,7 +12,61 @@
 #include <wx/mstream.h>
 #include <algorithm>
 
-// --- IMPLEMENTACIÓN DE BookCardPanel ---
+// ============================================================================
+// AUXILIAR: FUNCIÓN DE RENDERIZADO GLOSSY 3D
+// ============================================================================
+void DrawLibraryGlossyComponent(
+    wxGraphicsContext* gc,
+    double x,
+    double y,
+    double w,
+    double h,
+    double r,
+    wxColour baseColor,
+    wxString label,
+    bool isDarkText = false)
+{
+    wxGraphicsBrush bezel = gc->CreateLinearGradientBrush(
+        x, y,
+        x + w, y + h,
+        wxColour(255, 255, 255),
+        wxColour(150, 150, 150)
+    );
+    gc->SetBrush(bezel);
+    gc->SetPen(wxPen(wxColour(100, 100, 100), 1));
+    gc->DrawRoundedRectangle(x, y, w, h, r);
+
+    double m = 1.5;
+    wxGraphicsBrush body = gc->CreateLinearGradientBrush(
+        x, y,
+        x, y + h,
+        baseColor,
+        baseColor.ChangeLightness(60)
+    );
+    gc->SetBrush(body);
+    gc->SetPen(wxPen(baseColor.ChangeLightness(40), 1));
+    gc->DrawRoundedRectangle(x + m, y + m, w - (m * 2), h - (m * 2), r - 1);
+
+    wxGraphicsPath gloss = gc->CreatePath();
+    gloss.AddRoundedRectangle(x + m + 1, y + m + 1, w - (m * 2) - 2, (h / 2) - 1, r - 2);
+    wxGraphicsBrush glossBrush = gc->CreateLinearGradientBrush(
+        x, y,
+        x, y + h / 2,
+        wxColour(255, 255, 255, 160),
+        wxColour(255, 255, 255, 20)
+    );
+    gc->SetBrush(glossBrush);
+    gc->FillPath(gloss);
+
+    gc->SetFont(wxFont(9, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), isDarkText ? *wxBLACK : *wxWHITE);
+    double tw, th;
+    gc->GetTextExtent(label, &tw, &th);
+    gc->DrawText(label, x + (w - tw) / 2, y + (h - th) / 2);
+}
+
+// ============================================================================
+// IMPLEMENTACIÓN DE BookCardPanel (La Ficha del Libro)
+// ============================================================================
 
 wxBEGIN_EVENT_TABLE(BookCardPanel, wxPanel)
 EVT_LEFT_DOWN(BookCardPanel::on_internal_card_click)
@@ -23,30 +77,23 @@ BookCardPanel::BookCardPanel(
     wxWindow* parent,
     const LibroFicha& book_data,
     AppHandler* app_handler,
-    std::function<void(int)> on_click,
-    std::function<void(int)> on_delete)
-    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE),
-    m_book(book_data), m_app_handler(app_handler), m_on_click(on_click), m_on_delete(on_delete), m_is_active_style(false)
+    std::function<void(int)> on_details_click,
+    std::function<void(int)> on_read_click,
+    std::function<void(int)> on_delete_click)
+    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(CARD_WIDTH, CARD_HEIGHT), wxBORDER_NONE),
+    m_book(book_data),
+    m_app_handler(app_handler),
+    m_on_details_click(on_details_click),
+    m_on_read_click(on_read_click),
+    m_on_delete_click(on_delete_click),
+    m_is_active_style(false)
 {
-    ACTIVE_BG_COLOUR = wxColour(220, 235, 255);
+    ACTIVE_BG_COLOUR = wxColour(230, 245, 255);
     INACTIVE_BG_COLOUR = wxColour(255, 255, 255);
-    ACTIVE_BORDER_COLOUR = wxColour(0, 0, 128);
-    INACTIVE_BORDER_COLOUR = wxColour(180, 180, 180);
 
     this->SetBackgroundStyle(wxBG_STYLE_PAINT);
-    this->SetMinSize(wxSize(CARD_WIDTH, -1));
 
-    _create_controls();
-    _layout_controls();
-
-    set_active_style(false);
-}
-
-void BookCardPanel::_create_controls()
-{
     bool loaded = false;
-
-    // LECTURA DESDE BLOB EN RAM
     if (!m_book.cover_image_data.empty())
     {
         wxMemoryInputStream stream(m_book.cover_image_data.data(), m_book.cover_image_data.size());
@@ -54,71 +101,17 @@ void BookCardPanel::_create_controls()
         if (img.LoadFile(stream, wxBITMAP_TYPE_ANY))
         {
             img.Rescale(IMAGE_WIDTH, IMAGE_HEIGHT, wxIMAGE_QUALITY_HIGH);
-            m_cover_image_ctrl = new wxStaticBitmap(this, wxID_ANY, wxBitmap(img));
+            m_cover_bitmap = wxBitmap(img);
             loaded = true;
         }
     }
 
     if (!loaded)
     {
-        wxBitmap placeholder = Util::CreatePlaceholderBitmap(IMAGE_WIDTH, IMAGE_HEIGHT, "Portada");
-        m_cover_image_ctrl = new wxStaticBitmap(this, wxID_ANY, placeholder);
+        m_cover_bitmap = Util::CreatePlaceholderBitmap(IMAGE_WIDTH, IMAGE_HEIGHT, "Portada");
     }
 
-    m_title_label = new wxStaticText(this, wxID_ANY, wxString::FromUTF8(m_book.title),
-        wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL | wxST_NO_AUTORESIZE);
-    m_title_label->SetFont(wxFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
-
-    m_author_label = new wxStaticText(this, wxID_ANY, wxString::FromUTF8("por " + m_book.author),
-        wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL | wxST_NO_AUTORESIZE);
-    m_author_label->SetFont(wxFont(9, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_ITALIC, wxFONTWEIGHT_NORMAL));
-
-    m_btn_edit = new wxButton(this, wxID_ANY, "Editar", wxDefaultPosition, wxSize(60, 25));
-    m_btn_delete = new wxButton(this, wxID_ANY, "Borrar", wxDefaultPosition, wxSize(60, 25));
-
-    m_btn_delete->SetForegroundColour(wxColour(200, 0, 0));
-
-    m_cover_image_ctrl->Bind(wxEVT_LEFT_DOWN, &BookCardPanel::on_internal_card_click, this);
-    m_title_label->Bind(wxEVT_LEFT_DOWN, &BookCardPanel::on_internal_card_click, this);
-    m_author_label->Bind(wxEVT_LEFT_DOWN, &BookCardPanel::on_internal_card_click, this);
-
-    m_btn_edit->Bind(wxEVT_BUTTON, &BookCardPanel::on_edit_btn_click, this);
-    m_btn_delete->Bind(wxEVT_BUTTON, &BookCardPanel::on_delete_btn_click, this);
-}
-
-void BookCardPanel::_layout_controls()
-{
-    wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
-    sizer->Add(m_cover_image_ctrl, 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
-    sizer->Add(m_title_label, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
-    sizer->Add(m_author_label, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 5);
-
-    wxBoxSizer* btn_sizer = new wxBoxSizer(wxHORIZONTAL);
-    btn_sizer->Add(m_btn_edit, 0, wxRIGHT, 5);
-    btn_sizer->Add(m_btn_delete, 0, 0, 0);
-
-    sizer->Add(btn_sizer, 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 5);
-
-    this->SetSizer(sizer);
-
-    m_title_label->Wrap(CARD_WIDTH - 10);
-    m_author_label->Wrap(CARD_WIDTH - 10);
-}
-
-void BookCardPanel::on_internal_card_click(wxMouseEvent& event)
-{
-    if (m_on_click) m_on_click(m_book.id);
-    event.StopPropagation();
-}
-
-void BookCardPanel::on_edit_btn_click(wxCommandEvent& event)
-{
-    if (m_on_click) m_on_click(m_book.id);
-}
-
-void BookCardPanel::on_delete_btn_click(wxCommandEvent& event)
-{
-    if (m_on_delete) m_on_delete(m_book.id);
+    set_active_style(false);
 }
 
 void BookCardPanel::set_active_style(bool is_active)
@@ -135,29 +128,135 @@ void BookCardPanel::on_paint(wxPaintEvent& event)
     wxAutoBufferedPaintDC dc(this);
     std::unique_ptr<wxGraphicsContext> gc(wxGraphicsContext::Create(dc));
 
-    if (gc)
+    if (!gc)
     {
-        wxSize sz = GetClientSize();
-        wxGraphicsPath path = gc->CreatePath();
-        path.AddRoundedRectangle(0.5, 0.5, sz.x - 1, sz.y - 1, 3);
+        return;
+    }
 
-        if (m_is_active_style)
-        {
-            gc->SetBrush(wxBrush(ACTIVE_BG_COLOUR));
-            gc->SetPen(wxPen(ACTIVE_BORDER_COLOUR, ACTIVE_BORDER_WIDTH));
-        }
-        else
-        {
-            gc->SetBrush(wxBrush(INACTIVE_BG_COLOUR));
-            gc->SetPen(wxPen(INACTIVE_BORDER_COLOUR, INACTIVE_BORDER_WIDTH));
-        }
+    wxSize sz = GetClientSize();
 
-        gc->FillPath(path);
-        gc->StrokePath(path);
+    // 1. Fondo Transparente
+    wxColour tableroColor = GetParent()->GetBackgroundColour();
+    gc->SetBrush(wxBrush(tableroColor));
+    gc->SetPen(*wxTRANSPARENT_PEN);
+    gc->DrawRectangle(0, 0, sz.x, sz.y);
+
+    // 2. Marco Principal
+    int vis_h = sz.y - 18;
+
+    wxColour frameStart = m_is_active_style ? wxColour(100, 200, 255) : wxColour(255, 215, 0);
+    wxColour frameEnd = m_is_active_style ? wxColour(0, 100, 200) : wxColour(184, 134, 11);
+
+    wxGraphicsBrush goldBrush = gc->CreateLinearGradientBrush(
+        0, 0,
+        sz.x, vis_h,
+        frameStart, frameEnd
+    );
+
+    gc->SetBrush(goldBrush);
+    gc->SetPen(wxPen(m_is_active_style ? wxColour(0, 50, 100) : wxColour(139, 101, 8), 1));
+    gc->DrawRoundedRectangle(2, 2, sz.x - 4, vis_h - 4, 8);
+
+    gc->SetBrush(wxBrush(m_is_active_style ? ACTIVE_BG_COLOUR : INACTIVE_BG_COLOUR));
+    gc->SetPen(wxPen(wxColour(200, 200, 200), 1));
+    gc->DrawRoundedRectangle(5, 5, sz.x - 10, vis_h - 10, 6);
+
+    // 3. Portada
+    double img_x = (sz.x - IMAGE_WIDTH) / 2.0;
+    double img_y = 15.0;
+
+    gc->SetBrush(wxBrush(wxColour(200, 200, 200)));
+    gc->SetPen(*wxTRANSPARENT_PEN);
+    gc->DrawRectangle(img_x + 2, img_y + 2, IMAGE_WIDTH, IMAGE_HEIGHT);
+
+    gc->DrawBitmap(m_cover_bitmap, img_x, img_y, IMAGE_WIDTH, IMAGE_HEIGHT);
+
+    // 4. Título
+    wxString title_text = wxString::FromUTF8(m_book.title);
+    gc->SetFont(wxFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), *wxBLACK);
+
+    if (title_text.Length() > 20) title_text = title_text.Left(17) + "...";
+
+    double tw, th;
+    gc->GetTextExtent(title_text, &tw, &th);
+    gc->DrawText(title_text, (sz.x - tw) / 2.0, img_y + IMAGE_HEIGHT + 10);
+
+    // 5. Autor
+    wxString author_text = wxString::FromUTF8("por " + m_book.author);
+    gc->SetFont(wxFont(9, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_ITALIC, wxFONTWEIGHT_NORMAL), wxColour(80, 80, 80));
+
+    if (author_text.Length() > 25) author_text = author_text.Left(22) + "...";
+
+    double aw, ah;
+    gc->GetTextExtent(author_text, &aw, &ah);
+    gc->DrawText(author_text, (sz.x - aw) / 2.0, img_y + IMAGE_HEIGHT + 28);
+
+    // 6. BOTONES INTELIGENTES DE CONTEXTO
+    double btn_w = 60;
+    double btn_h = 24;
+    double btn_y = vis_h - (btn_h / 2);
+    double gap = 10;
+    double start_x = (sz.x - (btn_w * 2) - gap) / 2.0;
+
+    // Botón Izquierdo: Siempre es "Leer" (Verde)
+    DrawLibraryGlossyComponent(gc.get(), start_x, btn_y, btn_w, btn_h, 6, wxColour(144, 238, 144), "Leer", true);
+
+    // Botón Derecho: Cambia según si la tarjeta está activa
+    if (m_is_active_style)
+    {
+        // En el lateral: Mostrar "Borrar" (Rojo Pastel)
+        DrawLibraryGlossyComponent(gc.get(), start_x + btn_w + gap, btn_y, btn_w, btn_h, 6, wxColour(255, 150, 150), "Borrar", true);
+    }
+    else
+    {
+        // En el centro: Mostrar "Detalles" (Celeste)
+        DrawLibraryGlossyComponent(gc.get(), start_x + btn_w + gap, btn_y, btn_w, btn_h, 6, wxColour(173, 216, 230), "Detalles", true);
     }
 }
 
-// --- IMPLEMENTACIÓN DE LibraryView ---
+void BookCardPanel::on_internal_card_click(wxMouseEvent& event)
+{
+    wxPoint pos = event.GetPosition();
+    wxSize sz = GetClientSize();
+    int vis_h = sz.y - 18;
+
+    double btn_w = 60;
+    double btn_h = 24;
+    double btn_y = vis_h - (btn_h / 2);
+    double gap = 10;
+    double start_x = (sz.x - (btn_w * 2) - gap) / 2.0;
+
+    // Detectar clic en el botón IZQUIERDO (Leer)
+    if (pos.x >= start_x && pos.x <= start_x + btn_w && pos.y >= btn_y && pos.y <= btn_y + btn_h)
+    {
+        if (m_on_read_click) m_on_read_click(m_book.id);
+    }
+    // Detectar clic en el botón DERECHO (Detalles / Borrar)
+    else if (pos.x >= start_x + btn_w + gap && pos.x <= start_x + (btn_w * 2) + gap && pos.y >= btn_y && pos.y <= btn_y + btn_h)
+    {
+        if (m_is_active_style)
+        {
+            if (m_on_delete_click) m_on_delete_click(m_book.id);
+        }
+        else
+        {
+            if (m_on_details_click) m_on_details_click(m_book.id);
+        }
+    }
+    // Detectar clic en la tarjeta (Comportamiento base: Detalles)
+    else if (pos.y < vis_h)
+    {
+        if (m_on_details_click) m_on_details_click(m_book.id);
+    }
+    else
+    {
+        event.Skip();
+    }
+}
+
+// ============================================================================
+// IMPLEMENTACIÓN DE LibraryView
+// ============================================================================
 
 LibraryView::LibraryView(wxWindow* parent, AppHandler* app_handler)
     : wxScrolled<wxPanel>(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE),
@@ -216,6 +315,11 @@ void LibraryView::_clear_and_destroy_book_cards()
 void LibraryView::set_on_book_card_selected_callback(std::function<void(int)> callback)
 {
     m_on_card_selected_callback = callback;
+}
+
+void LibraryView::set_on_book_read_callback(std::function<void(int)> callback)
+{
+    m_on_book_read_callback = callback;
 }
 
 void LibraryView::_on_toggle_sort(wxCommandEvent& event)
@@ -375,7 +479,6 @@ void LibraryView::load_books()
             ficha.title = std::get<std::string>(row.at("title"));
             ficha.author = std::get<std::string>(row.at("author"));
 
-            // ASIGNACIÓN DEL BLOB
             if (row.count("cover_image_data") && std::holds_alternative<std::vector<uint8_t>>(row.at("cover_image_data")))
             {
                 ficha.cover_image_data = std::get<std::vector<uint8_t>>(row.at("cover_image_data"));
@@ -386,6 +489,7 @@ void LibraryView::load_books()
                 ficha,
                 m_app_handler,
                 m_on_card_selected_callback,
+                m_on_book_read_callback, // <- Nuevo Callback para "Leer"
                 [this](int id) { _on_delete_book_requested(id); }
             );
 

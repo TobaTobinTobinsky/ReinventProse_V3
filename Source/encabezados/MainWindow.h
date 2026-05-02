@@ -91,6 +91,7 @@ private:
     // Ventana y AUI
     void on_close(wxCloseEvent& event);
     void on_library_book_selected(int selected_book_id);
+    void on_library_book_read(int selected_book_id);
     void on_show_library_as_center(wxCommandEvent& event, bool force_clean = false);
 
     // Atributos
