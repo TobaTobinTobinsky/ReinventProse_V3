@@ -1,6 +1,7 @@
 /**
 * File Name: ChapterListView.cpp
 * Descripción: Implementación de la lista de capítulos con manejo robusto y seguro UTF-8.
+*              Refactorizado para usar exclusivamente wxString::Format y evitar corrupción por concatenación.
 */
 
 #include "../encabezados/ChapterListView.h"
@@ -26,14 +27,16 @@ ChapterListView::ChapterListView(wxWindow* parent, AppHandler* app_handler)
 }
 
 void ChapterListView::_create_controls() {
-    list_label = new wxStaticText(this, wxID_ANY, "Capítulos del Libro:");
+    // Uso de FromUTF8 para proteger las tildes estáticas
+    list_label = new wxStaticText(this, wxID_ANY, wxString::FromUTF8("Capítulos del Libro:"));
 
     // Creamos la lista y le indicamos a wxWidgets que solo se puede seleccionar 1 ítem a la vez
     chapter_list_ctrl = new wxListBox(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, nullptr, wxLB_SINGLE);
 
-    add_chapter_button = new wxButton(this, ID_ADD_CHAPTER, "Añadir Capítulo");
-    edit_chapter_button = new wxButton(this, ID_EDIT_CHAPTER, "Modificar Título");
-    delete_chapter_button = new wxButton(this, ID_DELETE_CHAPTER, "Eliminar Capítulo");
+    // Botones blindados contra problemas de codificación
+    add_chapter_button = new wxButton(this, ID_ADD_CHAPTER, wxString::FromUTF8("Añadir Capítulo"));
+    edit_chapter_button = new wxButton(this, ID_EDIT_CHAPTER, wxString::FromUTF8("Modificar Título"));
+    delete_chapter_button = new wxButton(this, ID_DELETE_CHAPTER, wxString::FromUTF8("Eliminar Capítulo"));
 }
 
 void ChapterListView::_layout_controls() {
@@ -76,7 +79,7 @@ void ChapterListView::load_chapters(std::optional<int> id) {
     chapters_data.clear();
 
     if (!book_id.has_value()) {
-        list_label->SetLabel("Capítulos: (Seleccione un libro)");
+        list_label->SetLabel(wxString::FromUTF8("Capítulos: (Seleccione un libro)"));
         _update_button_states();
         if (on_chapter_selected_callback) {
             on_chapter_selected_callback(std::nullopt);
@@ -92,8 +95,16 @@ void ChapterListView::load_chapters(std::optional<int> id) {
         titleStr = std::get<std::string>((*book_opt)["title"]);
     }
 
-    wxString labelText = wxString::Format("Capítulos de: %s", wxString::FromUTF8(titleStr));
-    if (labelText.Length() > 30) labelText = labelText.Left(30) + "...";
+    // TÉCNICA NINJA: En vez de concatenar, usamos Format combinando constantes UTF-8 y variables blindadas
+    wxString labelText = wxString::Format(
+        wxString::FromUTF8("Capítulos de: %s"),
+        wxString::FromUTF8(titleStr)
+    );
+
+    if (labelText.Length() > 30) {
+        // Reemplazo de `labelText.Left(30) + "..."` por Format puro
+        labelText = wxString::Format("%s...", labelText.Left(30));
+    }
     list_label->SetLabel(labelText);
 
     // Obtener los capítulos del AppHandler (Devuelve std::vector<DBRow>)
@@ -105,7 +116,12 @@ void ChapterListView::load_chapters(std::optional<int> id) {
         long long ch_num = std::get<long long>(chapter["chapter_number"]);
         std::string ch_title = std::get<std::string>(chapter["title"]);
 
-        wxString display_text = wxString::Format("Cap. %lld: %s", ch_num, wxString::FromUTF8(ch_title));
+        // Construcción blindada de la fila de la lista
+        wxString display_text = wxString::Format(
+            wxString::FromUTF8("Cap. %lld: %s"),
+            ch_num,
+            wxString::FromUTF8(ch_title)
+        );
 
         // Agregar el item a la lista
         int pos = chapter_list_ctrl->Append(display_text);
@@ -147,15 +163,24 @@ void ChapterListView::on_listbox_dclick(wxCommandEvent& event) {
 void ChapterListView::on_add_chapter(wxCommandEvent& event) {
     if (!book_id.has_value()) return;
 
-    // Abrir ventana de diálogo pidiendo el título
-    wxTextEntryDialog dlg(this, "Título del nuevo capítulo:", "Añadir Capítulo");
+    // Diálogos blindados con FromUTF8
+    wxTextEntryDialog dlg(
+        this,
+        wxString::FromUTF8("Título del nuevo capítulo:"),
+        wxString::FromUTF8("Añadir Capítulo")
+    );
 
     if (dlg.ShowModal() == wxID_OK) {
-        // BLINDAJE FORMAT PARA LAS TILDES
+        // BLINDAJE FORMAT PARA LAS TILDES AL EXTRAER VALORES
         wxString title = wxString::Format("%s", dlg.GetValue().Trim(true).Trim(false));
 
         if (title.IsEmpty()) {
-            wxMessageBox("El título del capítulo no puede estar vacío.", "Error de Validación", wxOK | wxICON_ERROR, this);
+            wxMessageBox(
+                wxString::FromUTF8("El título del capítulo no puede estar vacío."),
+                wxString::FromUTF8("Error de Validación"),
+                wxOK | wxICON_ERROR,
+                this
+            );
             return;
         }
 
@@ -200,15 +225,25 @@ void ChapterListView::on_edit_chapter(wxCommandEvent& event) {
         }
     }
 
-    // Mostrar el diálogo de edición con el texto pre-rellenado
-    wxTextEntryDialog dlg(this, "Introduzca el nuevo título para el capítulo:", "Modificar Título", current_title);
+    // Mostrar el diálogo de edición con el texto pre-rellenado y títulos blindados
+    wxTextEntryDialog dlg(
+        this,
+        wxString::FromUTF8("Introduzca el nuevo título para el capítulo:"),
+        wxString::FromUTF8("Modificar Título"),
+        current_title
+    );
 
     if (dlg.ShowModal() == wxID_OK) {
-        // BLINDAJE FORMAT PARA LAS TILDES
+        // BLINDAJE FORMAT AL RECIBIR DATOS DEL USUARIO
         wxString new_t = wxString::Format("%s", dlg.GetValue().Trim(true).Trim(false));
 
         if (new_t.IsEmpty()) {
-            wxMessageBox("El título del capítulo no puede estar vacío.", "Error", wxOK | wxICON_ERROR, this);
+            wxMessageBox(
+                wxString::FromUTF8("El título del capítulo no puede estar vacío."),
+                wxString::Format("%s", "Error"),
+                wxOK | wxICON_ERROR,
+                this
+            );
             return;
         }
 
@@ -233,9 +268,19 @@ void ChapterListView::on_delete_chapter(wxCommandEvent& event) {
     int ch_id = (int)(uintptr_t)chapter_list_ctrl->GetClientData(sel);
     wxString text = chapter_list_ctrl->GetString(sel);
 
-    wxString msg = "¿Está seguro de que desea eliminar el capítulo:\n\n'" + text + "'?\n\nEsta acción es irreversible y también eliminará todo su contenido e ideas asociadas.";
+    // ELIMINACIÓN DE LA CONCATENACIÓN CRÍTICA ('+' DESTERRADO)
+    // Uso de wxString::Format inyectando la variable (text) de manera segura
+    wxString msg = wxString::Format(
+        wxString::FromUTF8("¿Está seguro de que desea eliminar el capítulo:\n\n'%s'?\n\nEsta acción es irreversible y también eliminará todo su contenido e ideas asociadas."),
+        text
+    );
 
-    wxMessageDialog dlg(this, msg, "Confirmar Eliminación", wxYES_NO | wxNO_DEFAULT | wxICON_WARNING);
+    wxMessageDialog dlg(
+        this,
+        msg,
+        wxString::FromUTF8("Confirmar Eliminación"),
+        wxYES_NO | wxNO_DEFAULT | wxICON_WARNING
+    );
 
     // Si el usuario acepta, procedemos al borrado (La cascada SQL borra el resto)
     if (dlg.ShowModal() == wxID_YES) {

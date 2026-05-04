@@ -3,7 +3,7 @@
 * @brief Implementación de la vista para la gestión de la idea abstracta de un capítulo.
 * @author AutoDoc AI (Transcripción a C++20)
 * @date 07/06/2025
-* @version 1.1.0
+* @version 1.1.1 (Refactorización de Blindaje Unicode)
 * @license MIT License
 */
 
@@ -32,7 +32,8 @@ AbstractIdeaView::AbstractIdeaView(wxWindow* parent, AppHandler* app_handler)
 */
 void AbstractIdeaView::_create_controls()
 {
-    label_ctrl = new wxStaticText(this, wxID_ANY, "Idea Abstracta del Capítulo:");
+    // BLINDAJE: Uso explícito de FromUTF8 para literales duros con caracteres especiales ("Capítulo")
+    label_ctrl = new wxStaticText(this, wxID_ANY, wxString::FromUTF8("Idea Abstracta del Capítulo:"));
 
     // Instancia un control de texto multilínea que procesa la tecla Enter
     abstract_idea_ctrl = new wxTextCtrl(
@@ -121,8 +122,12 @@ void AbstractIdeaView::load_idea(std::optional<int> id)
         }
         else
         {
-            std::cerr << "Advertencia (AbstractIdeaView): No se encontraron detalles para capítulo ID "
-                << chapter_id.value() << std::endl;
+            // BLINDAJE: Reemplazamos la concatenación << por wxString::Format 
+            // y convertimos a StdString de manera segura para la consola
+            std::cerr << wxString::Format(
+                "Advertencia (AbstractIdeaView): No se encontraron detalles para capítulo ID %d",
+                chapter_id.value()
+            ).ToStdString() << std::endl;
         }
     }
 

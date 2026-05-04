@@ -1,6 +1,8 @@
 /**
 * Archivo: ChapterContentView.cpp
 * Descripción: Implementación del editor con interruptor animado, contador de palabras y lógica de protección UTF-8.
+* Autor: AutoDoc AI (Refactorizado con Blindaje UTF-8 y wxString::Format)
+* Versión: 3.1.0
 */
 
 #include "../encabezados/ChapterContentView.h"
@@ -9,7 +11,7 @@
 #include <wx/graphics.h>
 #include <wx/dcbuffer.h>
 #include <wx/settings.h>
-#include <wx/tokenzr.h> // Necesario para contar palabras
+#include <wx/tokenzr.h> 
 
 // ============================================================================
 // IMPLEMENTACIÓN: ModernToggleSwitch (Interruptor de Hardware Virtual)
@@ -123,10 +125,11 @@ ChapterContentView::ChapterContentView(wxWindow* parent, AppHandler* app_handler
 
 void ChapterContentView::_create_controls()
 {
-    content_label = new wxStaticText(this, wxID_ANY, "Contenido del Capítulo:");
+    // BLINDAJE: Uso estricto de FromUTF8 para proteger el acento de "Capítulo" y Format para asignarlo.
+    content_label = new wxStaticText(this, wxID_ANY, wxString::Format("%s", wxString::FromUTF8("Contenido del Capítulo:")));
 
-    // Etiqueta del contador de palabras con diseño estilizado
-    m_word_count_label = new wxStaticText(this, wxID_ANY, "Palabras: 0");
+    // BLINDAJE: Estandarización de formato para el contador inicial
+    m_word_count_label = new wxStaticText(this, wxID_ANY, wxString::Format("%s: %d", wxString::FromUTF8("Palabras"), 0));
     m_word_count_label->SetFont(wxFont(9, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_ITALIC, wxFONTWEIGHT_BOLD));
     m_word_count_label->SetForegroundColour(wxColour(100, 100, 100));
 
@@ -140,7 +143,9 @@ void ChapterContentView::_create_controls()
 
     // Creamos el interruptor moderno
     m_toggle = new ModernToggleSwitch(this, ID_TOGGLE_SWITCH);
-    m_toggle_label = new wxStaticText(this, wxID_ANY, "Modo Edición: Off");
+
+    // BLINDAJE: Protegiendo el acento de "Edición"
+    m_toggle_label = new wxStaticText(this, wxID_ANY, wxString::Format("%s: %s", wxString::FromUTF8("Modo Edición"), wxString::FromUTF8("Off")));
     m_toggle_label->SetFont(wxFont(9, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD));
 }
 
@@ -179,7 +184,8 @@ void ChapterContentView::_update_word_count()
     wxStringTokenizer tokenizer(current_text, " \t\r\n");
     int count = tokenizer.CountTokens();
 
-    m_word_count_label->SetLabel(wxString::Format("Palabras: %d", count));
+    // BLINDAJE: Concatenación segura mediante Format
+    m_word_count_label->SetLabel(wxString::Format("%s: %d", wxString::FromUTF8("Palabras"), count));
 
     // Forzamos actualización visual rápida del layout por si los números crecen
     this->Layout();
@@ -193,21 +199,26 @@ void ChapterContentView::load_content(std::optional<int> id)
 
     if (chapter_id.has_value())
     {
-        content_label->SetLabel("Editor de Prosa:");
+        // BLINDAJE: Asignación segura de literal
+        content_label->SetLabel(wxString::Format("%s", wxString::FromUTF8("Editor de Prosa:")));
+
         auto details_opt = app_handler->get_chapter_details(chapter_id.value());
         if (details_opt.has_value())
         {
             DBRow details = details_opt.value();
             if (details.count("content"))
             {
-                wxString texto = wxString::FromUTF8(std::get<std::string>(details["content"]));
-                content_ctrl->SetValue(texto);
+                // CONSEJO NINJA APLICADO: Extraer std::string -> Pasar a FromUTF8 -> Empaquetar en Format
+                std::string raw_content = std::get<std::string>(details["content"]);
+                wxString texto_seguro = wxString::Format("%s", wxString::FromUTF8(raw_content));
+                content_ctrl->SetValue(texto_seguro);
             }
         }
     }
     else
     {
-        content_label->SetLabel("Contenido: (Seleccione un capítulo)");
+        // BLINDAJE: Protegiendo los acentos de la instrucción
+        content_label->SetLabel(wxString::Format("%s", wxString::FromUTF8("Contenido: (Seleccione un capítulo)")));
     }
 
     // Actualizamos el contador recién cargamos el contenido
@@ -261,8 +272,10 @@ void ChapterContentView::_update_edit_mode_ui()
 
     content_ctrl->SetEditable(can_edit);
 
-    // Actualizar el texto del label
-    m_toggle_label->SetLabel(can_edit ? "Modo Edición: On" : "Modo Edición: Off");
+    // BLINDAJE: Uso de variables y Format para evitar la concatenación con operador ternario directo
+    wxString estado_str = can_edit ? wxString::FromUTF8("On") : wxString::FromUTF8("Off");
+    m_toggle_label->SetLabel(wxString::Format("%s: %s", wxString::FromUTF8("Modo Edición"), estado_str));
+
     m_toggle_label->SetForegroundColour(can_edit ? wxColour(0, 150, 0) : wxColour(150, 0, 0));
 
     if (can_edit)

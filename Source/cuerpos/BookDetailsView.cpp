@@ -1,6 +1,7 @@
 /**
 * File Name: BookDetailsView.cpp
-* Descripción: Implementación del panel de libro, con blindaje UTF-8 en el guardado.
+* Descripción: Implementación del panel de libro, con blindaje estricto UTF-8
+*              y estandarización universal de wxString::Format para prevención de crashes.
 */
 
 #include "../encabezados/BookDetailsView.h"
@@ -27,12 +28,13 @@ BookDetailsView::BookDetailsView(wxWindow* parent, AppHandler* app_handler)
 
 void BookDetailsView::_create_controls()
 {
-    title_label = new wxStaticText(this, wxID_ANY, "Título (*):");
-    author_label = new wxStaticText(this, wxID_ANY, "Autor (*):");
-    synopsis_label = new wxStaticText(this, wxID_ANY, "Sinopsis:");
-    prologue_label = new wxStaticText(this, wxID_ANY, "Prólogo:");
-    back_cover_text_label = new wxStaticText(this, wxID_ANY, "Texto de Contraportada:");
-    cover_image_label_text = new wxStaticText(this, wxID_ANY, "Imagen de Portada:");
+    // Blindaje de literales estáticos con caracteres especiales usando FromUTF8
+    title_label = new wxStaticText(this, wxID_ANY, wxString::FromUTF8("Título (*):"));
+    author_label = new wxStaticText(this, wxID_ANY, wxString::FromUTF8("Autor (*):"));
+    synopsis_label = new wxStaticText(this, wxID_ANY, wxString::FromUTF8("Sinopsis:"));
+    prologue_label = new wxStaticText(this, wxID_ANY, wxString::FromUTF8("Prólogo:"));
+    back_cover_text_label = new wxStaticText(this, wxID_ANY, wxString::FromUTF8("Texto de Contraportada:"));
+    cover_image_label_text = new wxStaticText(this, wxID_ANY, wxString::FromUTF8("Imagen de Portada:"));
 
     title_ctrl = new wxTextCtrl(this, wxID_ANY);
     author_ctrl = new wxTextCtrl(this, wxID_ANY);
@@ -40,7 +42,8 @@ void BookDetailsView::_create_controls()
     prologue_ctrl = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(-1, 80), wxTE_MULTILINE);
     back_cover_text_ctrl = new wxTextCtrl(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(-1, 80), wxTE_MULTILINE);
 
-    wxBitmap placeholder = Util::CreatePlaceholderBitmap(100, 150, "Portada");
+    // Blindaje en la creación del placeholder
+    wxBitmap placeholder = Util::CreatePlaceholderBitmap(100, 150, wxString::FromUTF8("Portada"));
     cover_image_display = new wxStaticBitmap(this, wxID_ANY, placeholder, wxDefaultPosition, wxSize(100, 150));
 
     wxTextCtrl* text_controls[] = { title_ctrl, author_ctrl, synopsis_ctrl, prologue_ctrl, back_cover_text_ctrl };
@@ -118,7 +121,7 @@ void BookDetailsView::load_book_details(std::optional<int> id)
         synopsis_ctrl->SetValue(wxEmptyString);
         prologue_ctrl->SetValue(wxEmptyString);
         back_cover_text_ctrl->SetValue(wxEmptyString);
-        cover_image_display->SetBitmap(Util::CreatePlaceholderBitmap(100, 150, "Portada"));
+        cover_image_display->SetBitmap(Util::CreatePlaceholderBitmap(100, 150, wxString::FromUTF8("Portada")));
     }
     else
     {
@@ -128,11 +131,13 @@ void BookDetailsView::load_book_details(std::optional<int> id)
         {
             DBRow& data = details_opt.value();
 
+            // Función Lambda refactorizada con el "Blindaje del Jefe"
             auto get_safe_string = [&](const std::string& key) -> wxString
                 {
                     if (data.count(key) && std::holds_alternative<std::string>(data.at(key)))
                     {
-                        return wxString::FromUTF8(std::get<std::string>(data.at(key)));
+                        // Extraemos el std::string, lo convertimos a UTF8 y lo aseguramos con Format
+                        return wxString::Format("%s", wxString::FromUTF8(std::get<std::string>(data.at(key))));
                     }
                     return wxEmptyString;
                 };
@@ -157,17 +162,17 @@ void BookDetailsView::load_book_details(std::optional<int> id)
                     }
                     else
                     {
-                        cover_image_display->SetBitmap(Util::CreatePlaceholderBitmap(100, 150, "Error"));
+                        cover_image_display->SetBitmap(Util::CreatePlaceholderBitmap(100, 150, wxString::FromUTF8("Error")));
                     }
                 }
                 else
                 {
-                    cover_image_display->SetBitmap(Util::CreatePlaceholderBitmap(100, 150, "Portada"));
+                    cover_image_display->SetBitmap(Util::CreatePlaceholderBitmap(100, 150, wxString::FromUTF8("Portada")));
                 }
             }
             else
             {
-                cover_image_display->SetBitmap(Util::CreatePlaceholderBitmap(100, 150, "Portada"));
+                cover_image_display->SetBitmap(Util::CreatePlaceholderBitmap(100, 150, wxString::FromUTF8("Portada")));
             }
         }
     }
@@ -184,18 +189,26 @@ bool BookDetailsView::save_changes()
         return false;
     }
 
-    wxString title = title_ctrl->GetValue().Trim(true).Trim(false);
-    wxString author = author_ctrl->GetValue().Trim(true).Trim(false);
+    // Recuperamos los valores y los blindamos inmediatamente con Format
+    wxString title = wxString::Format("%s", title_ctrl->GetValue().Trim(true).Trim(false));
+    wxString author = wxString::Format("%s", author_ctrl->GetValue().Trim(true).Trim(false));
 
     if (title.IsEmpty() || author.IsEmpty())
     {
-        wxMessageBox(wxString::FromUTF8("Título y autor son obligatorios."), "Error", wxOK | wxICON_WARNING, this);
+        // MessageBox estandarizado y seguro
+        wxMessageBox(
+            wxString::Format("%s", wxString::FromUTF8("Título y autor son obligatorios.")),
+            wxString::Format("%s", wxString::FromUTF8("Error de Validación")),
+            wxOK | wxICON_WARNING,
+            this
+        );
         return false;
     }
 
-    wxString synopsis = synopsis_ctrl->GetValue();
-    wxString prologue = prologue_ctrl->GetValue();
-    wxString back_cover = back_cover_text_ctrl->GetValue();
+    // Blindamos el resto de los campos de texto
+    wxString synopsis = wxString::Format("%s", synopsis_ctrl->GetValue());
+    wxString prologue = wxString::Format("%s", prologue_ctrl->GetValue());
+    wxString back_cover = wxString::Format("%s", back_cover_text_ctrl->GetValue());
 
     std::vector<uint8_t> cover_data;
     if (m_current_cover_image_data.has_value())
@@ -237,12 +250,16 @@ void BookDetailsView::on_image_clicked(wxMouseEvent& event)
 {
     if (!cover_image_display->IsEnabled()) return;
 
-    wxString wildcard = "Imágenes (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg";
-    wxFileDialog dialog(this, "Seleccionar imagen de portada", wxEmptyString, wxEmptyString, wildcard, wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    // Literales blindados
+    wxString wildcard = wxString::FromUTF8("Imágenes (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg");
+    wxString dialog_title = wxString::Format("%s", wxString::FromUTF8("Seleccionar imagen de portada"));
+
+    wxFileDialog dialog(this, dialog_title, wxEmptyString, wxEmptyString, wildcard, wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
     if (dialog.ShowModal() == wxID_OK)
     {
-        wxString new_path = dialog.GetPath();
+        // La ruta ya viene como wxString internamente desde el S.O.
+        wxString new_path = wxString::Format("%s", dialog.GetPath());
 
         wxFile file(new_path, wxFile::read);
         if (file.IsOpened())
@@ -263,12 +280,22 @@ void BookDetailsView::on_image_clicked(wxMouseEvent& event)
             }
             else
             {
-                wxMessageBox("El archivo seleccionado no es una imagen válida o está corrupto.", "Error", wxOK | wxICON_ERROR, this);
+                wxMessageBox(
+                    wxString::Format("%s", wxString::FromUTF8("El archivo seleccionado no es una imagen válida o está corrupto.")),
+                    wxString::Format("%s", wxString::FromUTF8("Error")),
+                    wxOK | wxICON_ERROR,
+                    this
+                );
             }
         }
         else
         {
-            wxMessageBox("No se pudo abrir el archivo físico de la imagen.", "Error", wxOK | wxICON_ERROR, this);
+            wxMessageBox(
+                wxString::Format("%s", wxString::FromUTF8("No se pudo abrir el archivo físico de la imagen.")),
+                wxString::Format("%s", wxString::FromUTF8("Error de Lectura")),
+                wxOK | wxICON_ERROR,
+                this
+            );
         }
     }
 }

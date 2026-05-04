@@ -1,10 +1,12 @@
 /**
 * File Name: DBManager.cpp
 * Descripción: Implementación del gestor de base de datos SQLite con soporte BLOB.
+*              Refactorizado: Blindaje UTF-8 con wxString::Format estricto.
 */
 
 #include "../encabezados/DBManager.h"
 #include <iostream>
+#include <wx/string.h> // INYECTADO: Para habilitar el Blindaje del Jefe (wxString::Format)
 
 DBManager* DBManager::_instance = nullptr;
 
@@ -36,7 +38,11 @@ void DBManager::_connect()
         {
             std::string err = sqlite3_errmsg(connection);
             connection = nullptr;
-            throw DatabaseError("Error al conectar con la base de datos: " + err);
+            // APLICADO BLINDAJE DEL JEFE: Formateo seguro para excepciones
+            throw DatabaseError(
+                wxString::Format("Error al conectar con la base de datos: %s",
+                    wxString::FromUTF8(err)).ToStdString()
+            );
         }
         sqlite3_exec(connection, "PRAGMA foreign_keys = ON;", nullptr, nullptr, nullptr);
     }
@@ -88,7 +94,11 @@ void DBManager::create_database()
     {
         std::string error(errMsg);
         sqlite3_free(errMsg);
-        throw DatabaseError("Error al inicializar tablas: " + error);
+        // APLICADO BLINDAJE DEL JEFE
+        throw DatabaseError(
+            wxString::Format("Error al inicializar tablas: %s",
+                wxString::FromUTF8(error)).ToStdString()
+        );
     }
     _disconnect();
 }
@@ -107,7 +117,12 @@ int DBManager::create_book(
 
     if (sqlite3_prepare_v2(connection, sql, -1, &stmt, nullptr) != SQLITE_OK)
     {
-        throw DatabaseError(sqlite3_errmsg(connection));
+        std::string err = sqlite3_errmsg(connection);
+        // APLICADO BLINDAJE DEL JEFE
+        throw DatabaseError(
+            wxString::Format("Error preparando inserción de libro: %s",
+                wxString::FromUTF8(err)).ToStdString()
+        );
     }
 
     sqlite3_bind_text(stmt, 1, title.c_str(), -1, SQLITE_TRANSIENT);
@@ -130,7 +145,11 @@ int DBManager::create_book(
     {
         std::string err = sqlite3_errmsg(connection);
         sqlite3_finalize(stmt);
-        throw BookCreationError("Fallo al insertar libro: " + err);
+        // APLICADO BLINDAJE DEL JEFE
+        throw BookCreationError(
+            wxString::Format("Fallo al insertar libro: %s",
+                wxString::FromUTF8(err)).ToStdString()
+        );
     }
 
     int id = (int)sqlite3_last_insert_rowid(connection);
@@ -194,7 +213,10 @@ std::optional<DBRow> DBManager::get_book_by_id(int book_id)
 
     if (!result)
     {
-        throw BookNotFoundError("Libro ID " + std::to_string(book_id) + " no encontrado.");
+        // APLICADO BLINDAJE DEL JEFE: Formateo estricto para enteros, eliminando std::to_string
+        throw BookNotFoundError(
+            wxString::Format("Libro ID %d no encontrado.", book_id).ToStdString()
+        );
     }
 
     return result;
@@ -319,8 +341,13 @@ int DBManager::create_chapter(int book_id, int chapter_number, const std::string
 
     if (sqlite3_step(stmt) != SQLITE_DONE)
     {
+        std::string err = sqlite3_errmsg(connection);
         sqlite3_finalize(stmt);
-        throw ChapterCreationError("Error al crear capítulo.");
+        // APLICADO BLINDAJE DEL JEFE
+        throw ChapterCreationError(
+            wxString::Format("Error al crear capítulo para el libro ID %d: %s",
+                book_id, wxString::FromUTF8(err)).ToStdString()
+        );
     }
 
     int id = (int)sqlite3_last_insert_rowid(connection);

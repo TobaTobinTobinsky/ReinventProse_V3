@@ -1,7 +1,8 @@
 /**
-* Archivo: NewBookDialog.cpp
-* Descripción: Implementación del diálogo de creación de libros con validación y soporte UTF-8.
-*/
+ * Archivo: NewBookDialog.cpp
+ * Descripción: Implementación del diálogo de creación de libros.
+ * Lógica aplicada: Blindaje Universal mediante wxString::Format.
+ */
 
 #include "../encabezados/NewBookDialog.h"
 #include "../encabezados/AppHandler.h"
@@ -9,11 +10,11 @@
 #include <wx/msgdlg.h>
 
 wxBEGIN_EVENT_TABLE(NewBookDialog, wxDialog)
-// El evento OK se vincula manualmente con Bind para mayor flexibilidad
+// Eventos vinculados dinámicamente mediante Bind en el constructor
 wxEND_EVENT_TABLE()
 
 NewBookDialog::NewBookDialog(wxWindow* parent, AppHandler* app_handler, const wxString& dialog_title)
-    : wxDialog(parent, wxID_ANY, dialog_title, wxDefaultPosition, wxSize(500, 350)),
+    : wxDialog(parent, wxID_ANY, wxString::Format("%s", dialog_title), wxDefaultPosition, wxSize(500, 350)),
     app_handler(app_handler)
 {
     _create_controls();
@@ -26,9 +27,10 @@ void NewBookDialog::_create_controls()
 {
     form_panel = new wxPanel(this, wxID_ANY);
 
-    title_label = new wxStaticText(form_panel, wxID_ANY, "Título (*):");
-    author_label = new wxStaticText(form_panel, wxID_ANY, "Autor (*):");
-    synopsis_label = new wxStaticText(form_panel, wxID_ANY, "Sinopsis:");
+    // Aplicación del Blindaje en etiquetas estáticas para consistencia total
+    title_label = new wxStaticText(form_panel, wxID_ANY, wxString::Format("Título (*):"));
+    author_label = new wxStaticText(form_panel, wxID_ANY, wxString::Format("Autor (*):"));
+    synopsis_label = new wxStaticText(form_panel, wxID_ANY, wxString::Format("Sinopsis:"));
 
     title_ctrl = new wxTextCtrl(form_panel, wxID_ANY);
     author_ctrl = new wxTextCtrl(form_panel, wxID_ANY);
@@ -36,15 +38,16 @@ void NewBookDialog::_create_controls()
     synopsis_ctrl = new wxTextCtrl(
         form_panel,
         wxID_ANY,
-        wxEmptyString,
+        wxString::Format(""), // Uso de Format en lugar de wxEmptyString
         wxDefaultPosition,
         wxSize(-1, 100),
         wxTE_MULTILINE
     );
 
-    ok_btn = new wxButton(this, wxID_OK, "Aceptar");
-    cancel_btn = new wxButton(this, wxID_CANCEL, "Cancelar");
+    ok_btn = new wxButton(this, wxID_OK, wxString::Format("Aceptar"));
+    cancel_btn = new wxButton(this, wxID_CANCEL, wxString::Format("Cancelar"));
 
+    // Vinculación segura
     ok_btn->Bind(wxEVT_BUTTON, &NewBookDialog::on_ok, this);
 }
 
@@ -79,21 +82,31 @@ void NewBookDialog::_layout_controls()
 
 void NewBookDialog::on_ok(wxCommandEvent& event)
 {
-    wxString title = title_ctrl->GetValue().Trim(true).Trim(false);
-    wxString author = author_ctrl->GetValue().Trim(true).Trim(false);
+    // Captura de datos con blindaje de formato
+    wxString title = wxString::Format("%s", title_ctrl->GetValue().Trim(true).Trim(false));
+    wxString author = wxString::Format("%s", author_ctrl->GetValue().Trim(true).Trim(false));
 
+    // Validación con mensajes blindados
     if (title.IsEmpty())
     {
-        wxMessageBox("Por favor, ingrese un título para el libro.",
-            "Campo Requerido", wxOK | wxICON_WARNING, this);
+        wxMessageBox(
+            wxString::Format("Por favor, ingrese un título para el libro."),
+            wxString::Format("Campo Requerido"),
+            wxOK | wxICON_WARNING,
+            this
+        );
         title_ctrl->SetFocus();
         return;
     }
 
     if (author.IsEmpty())
     {
-        wxMessageBox("Por favor, ingrese un autor para el libro.",
-            "Campo Requerido", wxOK | wxICON_WARNING, this);
+        wxMessageBox(
+            wxString::Format("Por favor, ingrese un autor para el libro."),
+            wxString::Format("Campo Requerido"),
+            wxOK | wxICON_WARNING,
+            this
+        );
         author_ctrl->SetFocus();
         return;
     }
@@ -105,10 +118,11 @@ std::map<std::string, wxString> NewBookDialog::get_book_data()
 {
     std::map<std::string, wxString> data;
 
-    // Se mantiene como wxString para que la conversión a UTF-8 se haga en AppHandler
-    data["title"] = title_ctrl->GetValue().Trim();
-    data["author"] = author_ctrl->GetValue().Trim();
-    data["synopsis"] = synopsis_ctrl->GetValue().Trim();
+    // Empaquetamiento final de datos usando Format para asegurar la integridad de la cadena
+    // antes de ser enviada al AppHandler
+    data["title"] = wxString::Format("%s", title_ctrl->GetValue().Trim());
+    data["author"] = wxString::Format("%s", author_ctrl->GetValue().Trim());
+    data["synopsis"] = wxString::Format("%s", synopsis_ctrl->GetValue().Trim());
 
     return data;
 }

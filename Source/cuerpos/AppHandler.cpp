@@ -1,7 +1,8 @@
 /**
 * File Name: AppHandler.cpp
 * Descripción: Implementación del manejador de lógica y puente entre UI y DB.
-* Autor: AutoDoc AI (Transcripción literal a C++20)
+*              [VERSIÓN BLINDADA UTF-8: Aplicación Estricta de wxString::Format]
+* Autor: AutoDoc AI / C++20 Edition
 * Date: 07/06/2025
 */
 
@@ -29,8 +30,9 @@ void AppHandler::initialize_database() {
         db_manager->create_database();
     }
     catch (const DatabaseError& e) {
-        wxMessageBox(wxString::Format("Error al inicializar la base de datos: %s", e.what()),
-            "Error de Base de Datos", wxOK | wxICON_ERROR);
+        // BLINDAJE: wxString::Format + wxString::FromUTF8 para asegurar lectura de DB
+        wxMessageBox(wxString::Format("Error al inicializar la base de datos: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error de Base de Datos"), wxOK | wxICON_ERROR);
         exit(1); // Error crítico, la app no puede seguir sin DB
     }
 }
@@ -62,12 +64,12 @@ std::optional<int> AppHandler::create_new_book(const wxString& title, const wxSt
         }
     }
     catch (const BookCreationError& e) {
-        wxMessageBox(wxString::Format("Error al crear el libro: %s", e.what()),
-            "Error de Creación de Libro", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al crear el libro: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error de Creación de Libro"), wxOK | wxICON_ERROR, main_window);
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error inesperado: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error inesperado: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
     }
     return std::nullopt;
 }
@@ -77,8 +79,8 @@ std::vector<DBRow> AppHandler::get_all_books() {
         return db_manager->get_all_books();
     }
     catch (const DatabaseError& e) {
-        wxMessageBox(wxString::Format("Error al obtener libros: %s", e.what()),
-            "Error de Base de Datos", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al obtener libros: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error de Base de Datos"), wxOK | wxICON_ERROR, main_window);
         return {};
     }
 }
@@ -91,8 +93,8 @@ std::optional<DBRow> AppHandler::get_book_details(int book_id) {
         return std::nullopt;
     }
     catch (const DatabaseError& e) {
-        wxMessageBox(wxString::Format("Error al obtener detalles: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al obtener detalles: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
         return std::nullopt;
     }
 }
@@ -111,8 +113,8 @@ bool AppHandler::update_book_details(int book_id, const wxString& title, const w
         );
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error al actualizar libro: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al actualizar libro: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
         return false;
     }
 }
@@ -126,8 +128,8 @@ bool AppHandler::delete_book(int book_id) {
         }
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error crítico al eliminar el libro: %s", e.what()),
-            "Error de Base de Datos", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error crítico al eliminar el libro: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error de Base de Datos"), wxOK | wxICON_ERROR, main_window);
     }
     return false;
 }
@@ -139,8 +141,8 @@ std::vector<DBRow> AppHandler::get_chapters_by_book_id(int book_id) {
         return db_manager->get_chapters_by_book_id(book_id);
     }
     catch (const DatabaseError& e) {
-        wxMessageBox(wxString::Format("Error al obtener capítulos: %s", e.what()),
-            "Error de Base de Datos", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al obtener capítulos: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error de Base de Datos"), wxOK | wxICON_ERROR, main_window);
         return {};
     }
 }
@@ -153,8 +155,8 @@ std::optional<DBRow> AppHandler::get_chapter_details(int chapter_id) {
         return std::nullopt;
     }
     catch (const DatabaseError& e) {
-        wxMessageBox(wxString::Format("Error al obtener detalles del capítulo: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al obtener detalles del capítulo: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
         return std::nullopt;
     }
 }
@@ -162,7 +164,6 @@ std::optional<DBRow> AppHandler::get_chapter_details(int chapter_id) {
 std::optional<int> AppHandler::create_new_chapter(int book_id, int chapter_number, const wxString& title,
     const wxString& content, const wxString& abstract_idea) {
     try {
-        // APLICADO BLINDAJE ToUTF8().data()
         int chapter_id = db_manager->create_chapter(
             book_id,
             chapter_number,
@@ -176,8 +177,8 @@ std::optional<int> AppHandler::create_new_chapter(int book_id, int chapter_numbe
         }
     }
     catch (const ChapterCreationError& e) {
-        wxMessageBox(wxString::Format("Error al crear capítulo: %s", e.what()),
-            "Error de Creación", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al crear capítulo: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error de Creación"), wxOK | wxICON_ERROR, main_window);
     }
     return std::nullopt;
 }
@@ -190,44 +191,41 @@ bool AppHandler::delete_chapter(int chapter_id) {
         }
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error al eliminar capítulo: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al eliminar capítulo: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
     }
     return false;
 }
 
 bool AppHandler::update_chapter_title(int chapter_id, const wxString& new_title) {
     try {
-        // APLICADO BLINDAJE ToUTF8().data()
         return db_manager->update_chapter_title(chapter_id, new_title.ToUTF8().data());
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error al actualizar título: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al actualizar título: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
         return false;
     }
 }
 
 bool AppHandler::update_chapter_content_via_handler(int chapter_id, const wxString& content) {
     try {
-        // APLICADO BLINDAJE ToUTF8().data()
         return db_manager->update_chapter_content_only(chapter_id, content.ToUTF8().data());
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error al actualizar contenido: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al actualizar contenido: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
         return false;
     }
 }
 
 bool AppHandler::update_chapter_abstract_idea_via_handler(int chapter_id, const wxString& abstract_idea) {
     try {
-        // APLICADO BLINDAJE ToUTF8().data()
         return db_manager->update_chapter_abstract_idea(chapter_id, abstract_idea.ToUTF8().data());
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error al actualizar idea: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al actualizar idea: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
         return false;
     }
 }
@@ -239,33 +237,31 @@ std::vector<DBRow> AppHandler::get_concrete_ideas_for_chapter(int chapter_id) {
         return db_manager->get_concrete_ideas_by_chapter_id(chapter_id);
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error al obtener ideas: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al obtener ideas: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
         return {};
     }
 }
 
 std::optional<int> AppHandler::add_concrete_idea_for_chapter(int chapter_id, const wxString& idea_text) {
     try {
-        // APLICADO BLINDAJE ToUTF8().data()
         int id = db_manager->add_concrete_idea(chapter_id, idea_text.ToUTF8().data());
         return id;
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error al agregar idea: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al agregar idea: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
         return std::nullopt;
     }
 }
 
 bool AppHandler::update_concrete_idea_text(int concrete_idea_id, const wxString& new_text) {
     try {
-        // APLICADO BLINDAJE ToUTF8().data()
         return db_manager->update_concrete_idea(concrete_idea_id, new_text.ToUTF8().data());
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error al actualizar idea: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al actualizar idea: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
         return false;
     }
 }
@@ -275,8 +271,8 @@ bool AppHandler::delete_concrete_idea_by_id(int concrete_idea_id) {
         return db_manager->delete_concrete_idea(concrete_idea_id);
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error al eliminar idea: %s", e.what()),
-            "Error", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al eliminar idea: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error"), wxOK | wxICON_ERROR, main_window);
         return false;
     }
 }
@@ -286,8 +282,8 @@ bool AppHandler::swap_concrete_idea_positions(int id1, int id2) {
         return db_manager->swap_concrete_idea_ids(id1, id2);
     }
     catch (const std::exception& e) {
-        wxMessageBox(wxString::Format("Error al reordenar ideas: %s", e.what()),
-            "Error de Base de Datos", wxOK | wxICON_ERROR, main_window);
+        wxMessageBox(wxString::Format("Error al reordenar ideas: %s", wxString::FromUTF8(e.what())),
+            wxString::Format("Error de Base de Datos"), wxOK | wxICON_ERROR, main_window);
         return false;
     }
 }
@@ -310,7 +306,12 @@ void AppHandler::prompt_save_changes(std::function<void()> on_save, std::functio
         return;
     }
 
-    wxMessageDialog dlg(main_window, "¿Desea guardar los cambios realizados?", "Guardar Cambios", wxYES_NO | wxCANCEL | wxICON_QUESTION);
+    // Uso de formato explícito incluso para literales puras para mantener la consistencia
+    wxMessageDialog dlg(main_window,
+        wxString::Format("¿Desea guardar los cambios realizados?"),
+        wxString::Format("Guardar Cambios"),
+        wxYES_NO | wxCANCEL | wxICON_QUESTION);
+
     int result = dlg.ShowModal();
 
     if (result == wxID_YES) on_save();

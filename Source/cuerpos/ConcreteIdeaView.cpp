@@ -1,6 +1,7 @@
 /**
 * File Name: ConcreteIdeaView.cpp
-* Descripción: Implementación del tablero de ideas con diseño de alta gama y lógica de reordenamiento.
+* Descripción: Implementación del tablero de ideas con diseño de alta gama,
+*              lógica de reordenamiento y blindaje estricto UTF-8 / wxString::Format.
 */
 
 #include "../encabezados/ConcreteIdeaView.h"
@@ -138,7 +139,10 @@ void ConcreteIdeaCard::OnPaint(wxPaintEvent& event) {
     // C. LETRA GIGANTE (Marca de agua decorativa)
     if (!m_text.empty())
     {
-        wxString first = wxString::FromUTF8(m_text.substr(0, 1)).Upper();
+        // BLINDAJE: Extraemos la inicial DESPUÉS de convertir a wxString. 
+        // std::string.substr(0,1) rompe caracteres UTF-8 de 2 bytes (como Ñ o Tildes).
+        wxString full_text_for_watermark = wxString::FromUTF8(m_text);
+        wxString first = full_text_for_watermark.Left(1).Upper();
 
         gc->SetFont(
             wxFont(vis_h - 20, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD),
@@ -164,7 +168,9 @@ void ConcreteIdeaCard::OnPaint(wxPaintEvent& event) {
     while (tk.HasMoreTokens())
     {
         wxString word = tk.GetNextToken();
-        wxString testLine = currentLine.IsEmpty() ? word : currentLine + " " + word;
+
+        // BLINDAJE: Eliminada la concatenación (+) por un wxString::Format seguro.
+        wxString testLine = currentLine.IsEmpty() ? word : wxString::Format("%s %s", currentLine, word);
 
         double tw, th;
         gc->GetTextExtent(testLine, &tw, &th);
@@ -189,7 +195,6 @@ void ConcreteIdeaCard::OnPaint(wxPaintEvent& event) {
     gc->DrawText(currentLine, 15, y_cursor);
 
     // E. BOTONES PROCEDURALES (Glossy Pastel)
-    // Argumentos: gc, x, y, w, h, r, baseColor, label, isDarkText
     DrawGlossyComponent(gc.get(), 10, sz.y - 32, 55, 24, 6, wxColour(144, 238, 144), "Leer", true);
     DrawGlossyComponent(gc.get(), 70, sz.y - 32, 55, 24, 6, wxColour(173, 216, 230), "Borrar", true);
 
@@ -197,7 +202,6 @@ void ConcreteIdeaCard::OnPaint(wxPaintEvent& event) {
     int count = (int)m_text.length();
     int display_count = count > 200 ? 200 : count;
 
-    // FIX: Se agregó el noveno argumento (false) para isDarkText
     DrawGlossyComponent(
         gc.get(),
         sz.x - 55,
@@ -277,6 +281,7 @@ IdeaDetailDialog::IdeaDetailDialog(wxWindow* parent, const std::string& initial_
     wxBoxSizer* counter_sizer = new wxBoxSizer(wxHORIZONTAL);
     counter_sizer->AddStretchSpacer(1);
 
+    // BLINDAJE: Uso estricto de Format para contadores
     wxStaticText* label_count = new wxStaticText(
         this, wxID_ANY,
         wxString::Format("%zu / 200", initial_text.length())
@@ -297,6 +302,8 @@ IdeaDetailDialog::IdeaDetailDialog(wxWindow* parent, const std::string& initial_
     // Actualización dinámica del contador
     m_text_ctrl->Bind(wxEVT_TEXT, [label_count](wxCommandEvent& ev) {
         int len = (int)ev.GetString().Length();
+
+        // BLINDAJE: Actualización por Format
         label_count->SetLabel(wxString::Format("%d / 200", len));
 
         if (len >= 200)
@@ -315,7 +322,7 @@ IdeaDetailDialog::IdeaDetailDialog(wxWindow* parent, const std::string& initial_
 
 std::string IdeaDetailDialog::GetText() const
 {
-    return m_text_ctrl->GetValue().ToUTF8().data();
+    return std::string(m_text_ctrl->GetValue().ToUTF8().data());
 }
 
 // ============================================================================
@@ -420,9 +427,13 @@ void ConcreteIdeaView::OnCardReadClicked(int id, std::string text)
 
     if (dlg.ShowModal() == wxID_OK)
     {
-        wxString secure_text = wxString::Format("%s", dlg.GetText());
+        // BLINDAJE NINJA: dlg.GetText() retorna std::string, LO CONVERTIMOS PREVIAMENTE A wxString
+        // para evitar Segfault/Access Violation en el Format.
+        wxString safe_utf8_string = wxString::FromUTF8(dlg.GetText());
+        wxString secure_text = wxString::Format("%s", safe_utf8_string);
 
-        if (secure_text.ToStdString() != text)
+        // BLINDAJE: Garantizamos comparación byte a byte correcta volviendo a extraer el std::string UTF-8
+        if (std::string(secure_text.ToUTF8().data()) != text)
         {
             if (m_app_handler->update_concrete_idea_text(id, secure_text))
             {
@@ -444,6 +455,7 @@ void ConcreteIdeaView::OnAddIdea(wxCommandEvent& event)
 
     if (dlg.ShowModal() == wxID_OK)
     {
+        // BLINDAJE: dlg.GetValue() retorna wxString, seguro para Format
         wxString secure_text = wxString::Format("%s", dlg.GetValue());
 
         if (!secure_text.IsEmpty())
